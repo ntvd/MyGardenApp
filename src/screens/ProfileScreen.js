@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { plants, areas } = useGarden();
   const totalPhotos = plants.reduce(
     (acc, p) => acc + p.growthLog.filter((l) => l.photo).length,
@@ -23,12 +23,12 @@ const ProfileScreen = () => {
   );
 
   const menuItems = [
-    { icon: 'notifications-outline', label: 'Reminders', subtitle: 'Set watering & care alerts' },
-    { icon: 'analytics-outline', label: 'Garden Stats', subtitle: 'View growth analytics' },
-    { icon: 'cloud-upload-outline', label: 'Backup & Sync', subtitle: 'Connect to cloud storage' },
-    { icon: 'share-outline', label: 'Share Garden', subtitle: 'Share with friends & family' },
-    { icon: 'moon-outline', label: 'Appearance', subtitle: 'Theme & display settings' },
-    { icon: 'help-circle-outline', label: 'Help & Tips', subtitle: 'Gardening guides & FAQ' },
+    { icon: 'notifications-outline', label: 'Reminders', subtitle: 'Set watering & care alerts', screen: 'Reminders' },
+    { icon: 'analytics-outline', label: 'Garden Stats', subtitle: 'View growth analytics', screen: null },
+    { icon: 'cloud-upload-outline', label: 'Backup & Sync', subtitle: 'Connect to cloud storage', screen: null },
+    { icon: 'share-outline', label: 'Share Garden', subtitle: 'Share with friends & family', screen: null },
+    { icon: 'moon-outline', label: 'Appearance', subtitle: 'Theme & display settings', screen: null },
+    { icon: 'help-circle-outline', label: 'Help & Tips', subtitle: 'Gardening guides & FAQ', screen: null },
   ];
 
   return (
@@ -73,7 +73,11 @@ const ProfileScreen = () => {
         {/* Menu Items */}
         <View style={styles.menuSection}>
           {menuItems.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={() => item.screen && navigation.navigate(item.screen)}
+            >
               <View style={styles.menuIconContainer}>
                 <Ionicons
                   name={item.icon}
