@@ -13,11 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
+import PlantPickerModal from '../components/PlantPickerModal';
 
 const CaptureScreen = () => {
-  const { plants, addGrowthLog, getRecentGrowthLogs } = useGarden();
+  const { addGrowthLog, getRecentGrowthLogs } = useGarden();
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [showPlantPicker, setShowPlantPicker] = useState(false);
   const recentLogs = getRecentGrowthLogs();
 
   const handleCapture = async (source) => {
@@ -132,33 +134,43 @@ const CaptureScreen = () => {
         {/* Plant Selector */}
         <View style={styles.plantSelector}>
           <Text style={styles.sectionTitle}>Select Plant</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.plantList}
+          <TouchableOpacity
+            style={[
+              styles.selectPlantButton,
+              selectedPlant && styles.selectPlantButtonSelected,
+            ]}
+            onPress={() => setShowPlantPicker(true)}
           >
-            {plants.map((plant) => (
-              <TouchableOpacity
-                key={plant._id}
-                style={[
-                  styles.plantChip,
-                  selectedPlant?._id === plant._id && styles.plantChipSelected,
-                ]}
-                onPress={() => setSelectedPlant(plant)}
-              >
-                <Text
-                  style={[
-                    styles.plantChipText,
-                    selectedPlant?._id === plant._id &&
-                      styles.plantChipTextSelected,
-                  ]}
-                >
-                  {plant.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            <Ionicons
+              name="leaf"
+              size={20}
+              color={selectedPlant ? COLORS.white : COLORS.primary}
+            />
+            <Text
+              style={[
+                styles.selectPlantButtonText,
+                selectedPlant && styles.selectPlantButtonTextSelected,
+              ]}
+            >
+              {selectedPlant ? selectedPlant.name : 'Choose plant(s)'}
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={selectedPlant ? COLORS.white : COLORS.textLight}
+            />
+          </TouchableOpacity>
         </View>
+
+        <PlantPickerModal
+          visible={showPlantPicker}
+          onClose={() => setShowPlantPicker(false)}
+          onDone={(selected) => {
+            if (selected.length > 0) setSelectedPlant(selected[0]);
+            setShowPlantPicker(false);
+          }}
+          multiSelect={false}
+        />
 
         {/* Save Button */}
         {capturedPhoto && selectedPlant && (
@@ -304,29 +316,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.lg,
     marginBottom: SIZES.sm,
   },
-  plantList: {
-    paddingHorizontal: SIZES.lg,
-    gap: SIZES.sm,
-  },
-  plantChip: {
+  selectPlantButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SIZES.lg,
+    paddingVertical: SIZES.md,
     paddingHorizontal: SIZES.md,
-    paddingVertical: SIZES.sm,
-    borderRadius: SIZES.radiusFull,
     backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
     borderWidth: 1.5,
     borderColor: COLORS.border,
+    gap: SIZES.sm,
   },
-  plantChipSelected: {
-    backgroundColor: COLORS.primary,
+  selectPlantButtonSelected: {
+    backgroundColor: COLORS.primaryMuted + '25',
     borderColor: COLORS.primary,
   },
-  plantChipText: {
-    fontSize: SIZES.fontSm,
+  selectPlantButtonText: {
+    flex: 1,
+    fontSize: SIZES.fontMd,
     fontWeight: '500',
     color: COLORS.textSecondary,
   },
-  plantChipTextSelected: {
-    color: COLORS.white,
+  selectPlantButtonTextSelected: {
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   saveButton: {
     flexDirection: 'row',

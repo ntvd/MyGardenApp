@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,13 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
+import PlantPickerModal from '../components/PlantPickerModal';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -51,17 +53,22 @@ const TIME_OPTIONS = [
 ];
 
 const RemindersScreen = () => {
-  const { plants } = useGarden();
+  const { plants, areas, getPlantById } = useGarden();
   const [reminders, setReminders] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPlantPicker, setShowPlantPicker] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
 
+  // plantScope: 'all' | { type: 'area', area } | { type: 'plants', plants: [] }
+  const [plantScope, setPlantScope] = useState('all');
+
   // New reminder form state
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedPlant, setSelectedPlant] = useState(null);
+  const [reminderTitle, setReminderTitle] = useState('');
   const [selectedFrequency, setSelectedFrequency] = useState(null);
   const [selectedTime, setSelectedTime] = useState(TIME_OPTIONS[0]);
   const [customNote, setCustomNote] = useState('');
+  const [editingReminderId, setEditingReminderId] = useState(null);
+  const modalScrollRef = useRef(null);
 
   useEffect(() => {
     checkPermissions();
@@ -95,6 +102,8 @@ const RemindersScreen = () => {
         type: notif.content.data?.type || 'custom',
         plantName: notif.content.data?.plantName || 'General',
         plantId: notif.content.data?.plantId || null,
+        plantIds: notif.content.data?.plantIds || null,
+        areaId: notif.content.data?.areaId || null,
         frequency: notif.content.data?.frequency || 'daily',
         timeLabel: notif.content.data?.timeLabel || 'Morning',
         title: notif.content.title,
@@ -107,16 +116,87 @@ const RemindersScreen = () => {
   };
 
   const resetForm = () => {
-    setSelectedType(null);
-    setSelectedPlant(null);
+    setReminderTitle('');
+    setPlantScope('all');
     setSelectedFrequency(null);
     setSelectedTime(TIME_OPTIONS[0]);
     setCustomNote('');
+    setEditingReminderId(null);
+  };
+
+  const getPlantScopeLabel = () => {
+    if (plantScope === 'all') return 'All plants';
+    if (plantScope.type === 'area') return plantScope.area.name;
+    if (plantScope.type === 'plants' && plantScope.plants.length > 0) {
+      return plantScope.plants.length === 1
+        ? plantScope.plants[0].name
+        : `${plantScope.plants.length} plants`;
+    }
+    return 'Choose plant(s)';
+  };
+
+  const getPlantScopeDataForNotification = () => {
+    if (plantScope === 'all')
+      return { plantName: 'General', plantId: null, plantIds: null, areaId: null };
+    if (plantScope.type === 'area')
+      return {
+        plantName: plantScope.area.name,
+        plantId: null,
+        plantIds: null,
+        areaId: plantScope.area._id,
+      };
+    if (plantScope.type === 'plants' && plantScope.plants.length > 0) {
+      const names = plantScope.plants.map((p) => p.name).join(', ');
+      return {
+        plantName: names,
+        plantId: plantScope.plants[0]._id,
+        plantIds: plantScope.plants.map((p) => p._id),
+        areaId: null,
+      };
+    }
+    return { plantName: 'General', plantId: null, plantIds: null, areaId: null };
+  };
+
+  const openForEdit = (reminder) => {
+    setReminderTitle(
+      (reminder.title || '').replace(/^🌱\s*/, '').trim()
+    );
+    let plantIds = reminder.plantIds ?? (reminder.plantId ? [reminder.plantId] : []);
+    if (!Array.isArray(plantIds) && typeof plantIds === 'string') {
+      try {
+        plantIds = JSON.parse(plantIds || '[]');
+      } catch {
+        plantIds = [];
+      }
+    }
+    if (!Array.isArray(plantIds)) plantIds = [];
+    const areaId = reminder.areaId;
+    if (areaId) {
+      const area = areas.find((a) => a._id === areaId);
+      if (area) setPlantScope({ type: 'area', area });
+      else setPlantScope('all');
+    } else if (plantIds.length > 0) {
+      const plist = plantIds.map((id) => getPlantById(id)).filter(Boolean);
+      if (plist.length > 0) setPlantScope({ type: 'plants', plants: plist });
+      else setPlantScope('all');
+    } else setPlantScope('all');
+    setSelectedFrequency(
+      FREQUENCY_OPTIONS.find((f) => f.id === reminder.frequency) ||
+        FREQUENCY_OPTIONS[0]
+    );
+    setSelectedTime(
+      TIME_OPTIONS.find((t) => t.label === reminder.timeLabel) ||
+        TIME_OPTIONS[0]
+    );
+    setCustomNote(reminder.body || '');
+    setEditingReminderId(reminder.id);
+    setShowCreateModal(true);
   };
 
   const handleCreate = async () => {
-    if (!selectedType) {
-      Alert.alert('Select a type', 'Choose what kind of reminder to set.');
+    const titleText = reminderTitle.trim();
+    if (!titleText) {
+      Alert.alert('Enter a title', 'Choose a title for your reminder (e.g. Time to water, trim, fertilize).');
       return;
     }
     if (!selectedFrequency) {
@@ -124,51 +204,32 @@ const RemindersScreen = () => {
       return;
     }
 
-    const typeInfo = REMINDER_TYPES.find((t) => t.id === selectedType);
-    const plantName = selectedPlant?.name || 'your garden';
-    const title = `🌱 Time to ${typeInfo.label.toLowerCase()}!`;
-    const body =
-      customNote ||
-      `Don't forget to ${typeInfo.label.toLowerCase()} ${plantName}.`;
+    const scopeData = getPlantScopeDataForNotification();
+    const title = titleText.startsWith('🌱') ? titleText : `🌱 ${titleText}`;
+    const body = customNote.trim();
 
     try {
-      // Schedule a repeating notification
-      const trigger =
-        selectedFrequency.id === 'daily'
-          ? {
-              hour: selectedTime.hour,
-              minute: 0,
-              repeats: true,
-            }
-          : selectedFrequency.id === 'weekly'
-          ? {
-              weekday: new Date().getDay() + 1,
-              hour: selectedTime.hour,
-              minute: 0,
-              repeats: true,
-            }
-          : selectedFrequency.id === 'monthly'
-          ? {
-              day: new Date().getDate(),
-              hour: selectedTime.hour,
-              minute: 0,
-              repeats: true,
-            }
-          : {
-              type: 'timeInterval',
-              seconds: selectedFrequency.seconds,
-              repeats: true,
-            };
+      if (editingReminderId) {
+        await Notifications.cancelScheduledNotificationAsync(editingReminderId);
+      }
 
-      const id = await Notifications.scheduleNotificationAsync({
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: selectedFrequency.seconds,
+        repeats: true,
+      };
+
+      await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
           sound: true,
           data: {
-            type: selectedType,
-            plantName: selectedPlant?.name || 'General',
-            plantId: selectedPlant?._id || null,
+            type: 'custom',
+            plantName: scopeData.plantName,
+            plantId: scopeData.plantId,
+            plantIds: scopeData.plantIds,
+            areaId: scopeData.areaId,
             frequency: selectedFrequency.id,
             timeLabel: selectedTime.label,
           },
@@ -179,7 +240,10 @@ const RemindersScreen = () => {
       setShowCreateModal(false);
       resetForm();
       loadReminders();
-      Alert.alert('Reminder Set! 🌱', `You'll be reminded to ${typeInfo.label.toLowerCase()} ${selectedFrequency.label.toLowerCase()}.`);
+      Alert.alert(
+        editingReminderId ? 'Reminder Updated 🌱' : 'Reminder Set! 🌱',
+        `You'll be reminded: ${titleText} ${selectedFrequency.label.toLowerCase()}.`
+      );
     } catch (err) {
       console.log('Error scheduling:', err);
       Alert.alert('Error', 'Could not schedule the reminder. Please try again.');
@@ -227,6 +291,7 @@ const RemindersScreen = () => {
       }}
     >
       <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalContentWrap}>
         <View style={styles.modalHeader}>
           <TouchableOpacity
             onPress={() => {
@@ -236,12 +301,15 @@ const RemindersScreen = () => {
           >
             <Text style={styles.modalCancel}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.modalTitle}>New Reminder</Text>
+          <Text style={styles.modalTitle}>
+            {editingReminderId ? 'Edit Reminder' : 'New Reminder'}
+          </Text>
           <TouchableOpacity onPress={handleCreate}>
             <Text
               style={[
                 styles.modalSave,
-                (!selectedType || !selectedFrequency) && styles.modalSaveDisabled,
+                (!reminderTitle.trim() || !selectedFrequency) &&
+                  styles.modalSaveDisabled,
               ]}
             >
               Save
@@ -249,44 +317,30 @@ const RemindersScreen = () => {
           </TouchableOpacity>
         </View>
 
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+        >
         <ScrollView
+          ref={modalScrollRef}
           style={styles.modalBody}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Reminder Type */}
-          <Text style={styles.formLabel}>What do you need to do?</Text>
-          <View style={styles.typeGrid}>
-            {REMINDER_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.typeChip,
-                  selectedType === type.id && {
-                    backgroundColor: type.color + '20',
-                    borderColor: type.color,
-                  },
-                ]}
-                onPress={() => setSelectedType(type.id)}
-              >
-                <Ionicons
-                  name={type.icon}
-                  size={20}
-                  color={selectedType === type.id ? type.color : COLORS.textLight}
-                />
-                <Text
-                  style={[
-                    styles.typeChipText,
-                    selectedType === type.id && { color: type.color },
-                  ]}
-                >
-                  {type.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Reminder Title */}
+          <Text style={styles.formLabel}>Title</Text>
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Choose title - e.g. Time to water, trim, fertilize"
+            placeholderTextColor={COLORS.textLight}
+            value={reminderTitle}
+            onChangeText={setReminderTitle}
+            autoCapitalize="sentences"
+          />
 
-          {/* Plant Selector */}
-          <Text style={styles.formLabel}>Which plant? (optional)</Text>
+          {/* Plant / Area Selector */}
+          <Text style={styles.formLabel}>Which plant or area? (optional)</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -295,40 +349,64 @@ const RemindersScreen = () => {
             <TouchableOpacity
               style={[
                 styles.plantChip,
-                !selectedPlant && styles.plantChipSelected,
+                plantScope === 'all' && styles.plantChipSelected,
               ]}
-              onPress={() => setSelectedPlant(null)}
+              onPress={() => setPlantScope('all')}
             >
               <Text
                 style={[
                   styles.plantChipText,
-                  !selectedPlant && styles.plantChipTextSelected,
+                  plantScope === 'all' && styles.plantChipTextSelected,
                 ]}
               >
-                All Plants
+                All plants
               </Text>
             </TouchableOpacity>
-            {plants.map((plant) => (
-              <TouchableOpacity
-                key={plant._id}
-                style={[
-                  styles.plantChip,
-                  selectedPlant?._id === plant._id && styles.plantChipSelected,
-                ]}
-                onPress={() => setSelectedPlant(plant)}
-              >
-                <Text
-                  style={[
-                    styles.plantChipText,
-                    selectedPlant?._id === plant._id &&
-                      styles.plantChipTextSelected,
-                  ]}
+            {areas.map((area) => {
+              const selected =
+                plantScope.type === 'area' && plantScope.area._id === area._id;
+              return (
+                <TouchableOpacity
+                  key={area._id}
+                  style={[styles.plantChip, selected && styles.plantChipSelected]}
+                  onPress={() => setPlantScope({ type: 'area', area })}
                 >
-                  {plant.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.plantChipText,
+                      selected && styles.plantChipTextSelected,
+                    ]}
+                  >
+                    {area.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[
+                styles.plantChip,
+                plantScope.type === 'plants' && styles.plantChipSelected,
+              ]}
+              onPress={() => setShowPlantPicker(true)}
+            >
+              <Text
+                style={[
+                  styles.plantChipText,
+                  plantScope.type === 'plants' &&
+                    styles.plantChipTextSelected,
+                ]}
+              >
+                {plantScope.type === 'plants' && plantScope.plants.length > 0
+                  ? getPlantScopeLabel()
+                  : 'Choose plant(s)'}
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
+          {plantScope.type === 'plants' && plantScope.plants.length > 1 && (
+            <Text style={styles.selectedPlantsHint} numberOfLines={1}>
+              {plantScope.plants.map((p) => p.name).join(', ')}
+            </Text>
+          )}
 
           {/* Frequency */}
           <Text style={styles.formLabel}>How often?</Text>
@@ -396,10 +474,32 @@ const RemindersScreen = () => {
             value={customNote}
             onChangeText={setCustomNote}
             multiline
+            scrollEnabled={false}
           />
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 20 }} />
         </ScrollView>
+        </KeyboardAvoidingView>
+
+        {showPlantPicker && (
+          <View style={StyleSheet.absoluteFill}>
+            <PlantPickerModal
+              visible
+              asOverlay
+              onClose={() => setShowPlantPicker(false)}
+              onDone={(selected) => {
+                setPlantScope(
+                  selected.length > 0
+                    ? { type: 'plants', plants: selected }
+                    : 'all'
+                );
+                setShowPlantPicker(false);
+              }}
+              multiSelect
+            />
+          </View>
+        )}
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -513,12 +613,28 @@ const RemindersScreen = () => {
                       )}
                     </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDelete(reminder.id)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-                  </TouchableOpacity>
+                  <View style={styles.reminderActions}>
+                    <TouchableOpacity
+                      style={styles.editBtn}
+                      onPress={() => openForEdit(reminder)}
+                    >
+                      <Ionicons
+                        name="pencil-outline"
+                        size={18}
+                        color={COLORS.primary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDelete(reminder.id)}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color={COLORS.danger}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })}
@@ -671,13 +787,24 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontXs,
     color: COLORS.textLight,
   },
+  reminderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.xs,
+  },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   deleteBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SIZES.xs,
   },
   emptyState: {
     alignItems: 'center',
@@ -704,6 +831,10 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  modalContentWrap: {
+    flex: 1,
+    position: 'relative',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -768,6 +899,12 @@ const styles = StyleSheet.create({
   plantScrollContent: {
     paddingHorizontal: SIZES.lg,
     gap: SIZES.sm,
+  },
+  selectedPlantsHint: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textLight,
+    paddingHorizontal: SIZES.lg,
+    marginTop: SIZES.xs,
   },
   plantChip: {
     paddingHorizontal: SIZES.md,
@@ -842,8 +979,9 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '600',
   },
-  noteInput: {
+  titleInput: {
     marginHorizontal: SIZES.lg,
+    marginBottom: SIZES.sm,
     backgroundColor: COLORS.backgroundCard,
     borderRadius: SIZES.radiusMd,
     padding: SIZES.md,
@@ -851,7 +989,17 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     borderWidth: 1,
     borderColor: COLORS.border,
-    minHeight: 80,
+  },
+  noteInput: {
+    marginHorizontal: SIZES.lg,
+    marginBottom: 50,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    padding: SIZES.md,
+    fontSize: SIZES.fontMd,
+    color: COLORS.textPrimary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     textAlignVertical: 'top',
   },
 });
