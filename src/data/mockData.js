@@ -8,6 +8,7 @@ export const GARDEN_AREAS = [
     emoji: '🌻',
     description: 'The welcoming entrance garden',
     coverColor: '#7CB342',
+    coverImage: null,
   },
   {
     _id: 'area_2',
@@ -15,6 +16,7 @@ export const GARDEN_AREAS = [
     emoji: '🌿',
     description: 'The main growing space',
     coverColor: '#558B2F',
+    coverImage: null,
   },
   {
     _id: 'area_3',
@@ -22,6 +24,7 @@ export const GARDEN_AREAS = [
     emoji: '🪴',
     description: 'Container garden on the balcony',
     coverColor: '#8D6E63',
+    coverImage: null,
   },
 ];
 
