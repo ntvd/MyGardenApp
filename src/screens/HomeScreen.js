@@ -19,8 +19,14 @@ import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
 
 const HomeScreen = ({ navigation }) => {
-  const { areas, getRecentGrowthLogs, addArea, updateArea, deleteArea } =
-    useGarden();
+  const {
+    areas,
+    categories,
+    getRecentGrowthLogs,
+    addArea,
+    updateArea,
+    deleteArea,
+  } = useGarden();
   const recentLogs = getRecentGrowthLogs().slice(0, 3);
   const [isAreaModalVisible, setIsAreaModalVisible] = useState(false);
   const [editingAreaId, setEditingAreaId] = useState(null);
@@ -156,12 +162,12 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.statLabel}>Areas</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
-            <Text style={styles.statLabel}>Plants</Text>
+            <Text style={styles.statNumber}>{categories.length}</Text>
+            <Text style={styles.statLabel}>Varieties</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{recentLogs.length}</Text>
-            <Text style={styles.statLabel}>Recent</Text>
+            <Text style={styles.statNumber}>8</Text>
+            <Text style={styles.statLabel}>Plants</Text>
           </View>
         </View>
 

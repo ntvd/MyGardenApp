@@ -9,6 +9,7 @@ A React Native (Expo) mobile app for managing your garden and tracking plant gro
 ```bash
 cd garden-app
 npm install
+npx expo install expo-notifications
 npx expo start
 ```
 
