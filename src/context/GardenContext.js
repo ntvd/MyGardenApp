@@ -17,7 +17,7 @@ export const useGarden = () => {
 
 export const GardenProvider = ({ children }) => {
   const [areas, setAreas] = useState(initialAreas);
-  const [categories] = useState(initialCategories);
+  const [categories, setCategories] = useState(initialCategories);
   const [plants, setPlants] = useState(initialPlants);
 
   // ---- Future: replace these with API calls to Node.js backend ----
@@ -59,6 +59,19 @@ export const GardenProvider = ({ children }) => {
     );
   };
 
+  const deleteGrowthLog = (plantId, logId) => {
+    setPlants((prev) =>
+      prev.map((p) =>
+        p._id === plantId
+          ? {
+              ...p,
+              growthLog: p.growthLog.filter((log) => log._id !== logId),
+            }
+          : p
+      )
+    );
+  };
+
   const addPlant = (newPlant) => {
     // Future: POST /api/plants
     const plant = {
@@ -69,6 +82,20 @@ export const GardenProvider = ({ children }) => {
     };
     setPlants((prev) => [...prev, plant]);
     return plant;
+  };
+
+  const deletePlant = (plantId) => {
+    setPlants((prev) => prev.filter((plant) => plant._id !== plantId));
+  };
+
+  const addCategory = (newCategory) => {
+    const category = {
+      _id: `cat_${Date.now()}`,
+      name: newCategory.name,
+      emoji: newCategory.emoji || '🌱',
+    };
+    setCategories((prev) => [category, ...prev]);
+    return category;
   };
 
   const addArea = (newArea) => {
@@ -123,7 +150,10 @@ export const GardenProvider = ({ children }) => {
         getPlantById,
         getCategoriesForArea,
         addGrowthLog,
+        deleteGrowthLog,
         addPlant,
+        deletePlant,
+        addCategory,
         addArea,
         updateArea,
         deleteArea,

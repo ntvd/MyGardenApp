@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGarden } from '../context/GardenContext';
@@ -12,9 +17,31 @@ import { COLORS, SIZES } from '../theme';
 
 const AreaScreen = ({ route, navigation }) => {
   const { areaId, areaName } = route.params;
-  const { getCategoriesForArea, areas } = useGarden();
+  const { getCategoriesForArea, areas, addCategory } = useGarden();
   const categories = getCategoriesForArea(areaId);
   const area = areas.find((a) => a._id === areaId);
+  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ name: '', emoji: '🌱' });
+
+  const openNewCategory = () => {
+    setCategoryForm({ name: '', emoji: '🌱' });
+    setIsCategoryModalVisible(true);
+  };
+
+  const closeCategoryModal = () => {
+    setIsCategoryModalVisible(false);
+  };
+
+  const handleSaveCategory = () => {
+    const trimmedName = categoryForm.name.trim();
+    if (!trimmedName) {
+      Alert.alert('Name required', 'Please enter a category name.');
+      return;
+    }
+
+    addCategory({ name: trimmedName, emoji: categoryForm.emoji.trim() });
+    setIsCategoryModalVisible(false);
+  };
 
   return (
     <ScrollView
@@ -76,7 +103,11 @@ const AreaScreen = ({ route, navigation }) => {
         ))}
 
         {/* Add New Category button */}
-        <TouchableOpacity style={styles.addCard} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.addCard}
+          activeOpacity={0.7}
+          onPress={openNewCategory}
+        >
           <View style={styles.addIcon}>
             <Ionicons name="add" size={28} color={COLORS.textLight} />
           </View>
@@ -85,6 +116,60 @@ const AreaScreen = ({ route, navigation }) => {
       </View>
 
       <View style={{ height: 40 }} />
+
+      <Modal
+        visible={isCategoryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeCategoryModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>New Category</Text>
+            <Text style={styles.inputLabel}>Name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={categoryForm.name}
+              onChangeText={(text) =>
+                setCategoryForm((prev) => ({ ...prev, name: text }))
+              }
+              placeholder="e.g. Herbs"
+              placeholderTextColor={COLORS.textLight}
+            />
+
+            <Text style={styles.inputLabel}>Emoji</Text>
+            <TextInput
+              style={styles.textInput}
+              value={categoryForm.emoji}
+              onChangeText={(text) =>
+                setCategoryForm((prev) => ({ ...prev, emoji: text }))
+              }
+              placeholder="🌿"
+              placeholderTextColor={COLORS.textLight}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={closeCategoryModal}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalPrimary]}
+                onPress={handleSaveCategory}
+              >
+                <Text style={[styles.modalBtnText, styles.modalPrimaryText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 };
@@ -196,6 +281,60 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontSm,
     color: COLORS.textLight,
     fontWeight: '500',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: SIZES.lg,
+  },
+  modalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.radiusLg,
+    padding: SIZES.lg,
+  },
+  modalTitle: {
+    fontSize: SIZES.fontLg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.md,
+  },
+  inputLabel: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    marginTop: SIZES.sm,
+  },
+  textInput: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    fontSize: SIZES.fontSm,
+    color: COLORS.textPrimary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.sm,
+    marginTop: SIZES.md,
+  },
+  modalBtn: {
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    borderRadius: SIZES.radiusMd,
+    backgroundColor: COLORS.backgroundCard,
+  },
+  modalBtnText: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  modalPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  modalPrimaryText: {
+    color: COLORS.white,
   },
 });
 

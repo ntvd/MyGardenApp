@@ -7,72 +7,119 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
 
-const PlantDetailScreen = ({ route }) => {
+const PlantDetailScreen = ({ route, navigation }) => {
   const { plantId } = route.params;
-  const { getPlantById, addGrowthLog } = useGarden();
+  const { getPlantById, addGrowthLog, deleteGrowthLog, deletePlant } =
+    useGarden();
   const [plant, setPlantState] = useState(getPlantById(plantId));
+  const [isEntryModalVisible, setIsEntryModalVisible] = useState(false);
+  const [entryNote, setEntryNote] = useState('');
+  const [entryPhoto, setEntryPhoto] = useState(null);
+  const [isPhotoViewerVisible, setIsPhotoViewerVisible] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   // Refresh plant data from context
   const refreshPlant = () => {
     setPlantState(getPlantById(plantId));
   };
 
-  const handleAddPhoto = async () => {
-    const permResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permResult.granted) {
+  const openEntryModal = () => {
+    setEntryNote('');
+    setEntryPhoto(null);
+    setIsEntryModalVisible(true);
+  };
+
+  const closeEntryModal = () => {
+    setIsEntryModalVisible(false);
+  };
+
+  const pickEntryImage = async (source) => {
+    const permissionResult =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
       Alert.alert(
         'Permission needed',
-        'Camera access is required to take plant photos.'
+        source === 'camera'
+          ? 'Camera access is required to take plant photos.'
+          : 'Photo library access is required to choose photos.'
       );
       return;
     }
 
-    Alert.alert('Add Growth Entry', 'Choose photo source', [
-      {
-        text: 'Camera',
-        onPress: async () => {
-          const result = await ImagePicker.launchCameraAsync({
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.8,
           });
-          if (!result.canceled) {
-            saveGrowthEntry(result.assets[0].uri);
-          }
-        },
-      },
-      {
-        text: 'Photo Library',
-        onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled) {
-            saveGrowthEntry(result.assets[0].uri);
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+
+    if (!result.canceled && result.assets?.length) {
+      setEntryPhoto(result.assets[0].uri);
+    }
   };
 
-  const saveGrowthEntry = (photoUri) => {
+  const saveGrowthEntry = () => {
+    if (!entryNote.trim() && !entryPhoto) {
+      Alert.alert('Add details', 'Write a note or add a photo.');
+      return;
+    }
+
     const newLog = {
       _id: `log_${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
-      photo: photoUri,
-      note: 'New growth photo',
+      photo: entryPhoto,
+      note: entryNote.trim() || 'New growth entry',
     };
     addGrowthLog(plantId, newLog);
     refreshPlant();
+    setIsEntryModalVisible(false);
+  };
+
+  const confirmDeleteLog = (logId) => {
+    Alert.alert('Delete entry', 'Remove this growth entry?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteGrowthLog(plantId, logId);
+          refreshPlant();
+        },
+      },
+    ]);
+  };
+
+  const confirmDeletePlant = () => {
+    Alert.alert('Delete plant', `Remove ${plant.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deletePlant(plantId);
+          navigation.goBack();
+        },
+      },
+    ]);
   };
 
   if (!plant) {
@@ -122,12 +169,20 @@ const PlantDetailScreen = ({ route }) => {
               Planted {plant.datePlanted} · {daysSincePlanted} days ago
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.addPhotoBtn}
-            onPress={handleAddPhoto}
-          >
-            <Ionicons name="camera" size={20} color={COLORS.white} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.addPhotoBtn}
+              onPress={openEntryModal}
+            >
+              <Ionicons name="create" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addPhotoBtn, styles.deleteBtn]}
+              onPress={confirmDeletePlant}
+            >
+              <Ionicons name="trash" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.description}>{plant.description}</Text>
@@ -184,12 +239,31 @@ const PlantDetailScreen = ({ route }) => {
 
               {/* Content */}
               <View style={styles.timelineContent}>
-                <Text style={styles.timelineDate}>{log.date}</Text>
+                <View style={styles.timelineHeaderRow}>
+                  <Text style={styles.timelineDate}>{log.date}</Text>
+                  <TouchableOpacity
+                    style={styles.entryDeleteBtn}
+                    onPress={() => confirmDeleteLog(log._id)}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={COLORS.error}
+                    />
+                  </TouchableOpacity>
+                </View>
                 {log.photo && (
-                  <Image
-                    source={{ uri: log.photo }}
-                    style={styles.timelinePhoto}
-                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedPhoto(log.photo);
+                      setIsPhotoViewerVisible(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: log.photo }}
+                      style={styles.timelinePhoto}
+                    />
+                  </TouchableOpacity>
                 )}
                 <Text style={styles.timelineNote}>{log.note}</Text>
               </View>
@@ -206,19 +280,126 @@ const PlantDetailScreen = ({ route }) => {
             {plant.growthLog
               .filter((l) => l.photo)
               .map((log) => (
-                <View key={log._id} style={styles.photoGridItem}>
+                <TouchableOpacity
+                  key={log._id}
+                  style={styles.photoGridItem}
+                  onPress={() => {
+                    setSelectedPhoto(log.photo);
+                    setIsPhotoViewerVisible(true);
+                  }}
+                >
                   <Image
                     source={{ uri: log.photo }}
                     style={styles.photoGridImage}
                   />
                   <Text style={styles.photoGridDate}>{log.date}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
           </View>
         </View>
       )}
 
       <View style={{ height: 40 }} />
+
+      <Modal
+        visible={isEntryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEntryModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>New Growth Entry</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={entryNote}
+              onChangeText={setEntryNote}
+              placeholder="Add a note about growth"
+              placeholderTextColor={COLORS.textLight}
+              multiline
+            />
+
+            <View style={styles.imagePickerRow}>
+              <TouchableOpacity
+                style={styles.imagePickerBtn}
+                onPress={() => pickEntryImage('camera')}
+              >
+                <Ionicons name="camera" size={18} color={COLORS.primary} />
+                <Text style={styles.imagePickerText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imagePickerBtn}
+                onPress={() => pickEntryImage('gallery')}
+              >
+                <Ionicons name="images" size={18} color={COLORS.primary} />
+                <Text style={styles.imagePickerText}>Gallery</Text>
+              </TouchableOpacity>
+              {entryPhoto ? (
+                <TouchableOpacity
+                  style={[styles.imagePickerBtn, styles.removeImageBtn]}
+                  onPress={() => setEntryPhoto(null)}
+                >
+                  <Ionicons name="close" size={18} color={COLORS.error} />
+                  <Text
+                    style={[styles.imagePickerText, styles.removeImageText]}
+                  >
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {entryPhoto ? (
+              <Image
+                source={{ uri: entryPhoto }}
+                style={styles.entryPreview}
+              />
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={closeEntryModal}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalPrimary]}
+                onPress={saveGrowthEntry}
+              >
+                <Text style={[styles.modalBtnText, styles.modalPrimaryText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={isPhotoViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPhotoViewerVisible(false)}
+      >
+        <View style={styles.photoViewerBackdrop}>
+          <TouchableOpacity
+            style={styles.photoViewerClose}
+            onPress={() => setIsPhotoViewerVisible(false)}
+          >
+            <Ionicons name="close" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          {selectedPhoto ? (
+            <Image
+              source={{ uri: selectedPhoto }}
+              style={styles.photoViewerImage}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -262,6 +443,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: SIZES.md,
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: SIZES.sm,
+  },
   infoHeaderLeft: {
     flex: 1,
   },
@@ -288,6 +473,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+  },
+  deleteBtn: {
+    backgroundColor: COLORS.error,
+    shadowColor: COLORS.error,
   },
   description: {
     fontSize: SIZES.fontMd,
@@ -371,11 +560,20 @@ const styles = StyleSheet.create({
     paddingBottom: SIZES.md,
     paddingLeft: SIZES.sm,
   },
+  timelineHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   timelineDate: {
     fontSize: SIZES.fontSm,
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: SIZES.xs,
+  },
+  entryDeleteBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   timelinePhoto: {
     width: '100%',
@@ -422,6 +620,111 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     textAlign: 'center',
     marginTop: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: SIZES.lg,
+  },
+  modalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.radiusLg,
+    padding: SIZES.lg,
+  },
+  modalTitle: {
+    fontSize: SIZES.fontLg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.md,
+  },
+  textInput: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    fontSize: SIZES.fontSm,
+    color: COLORS.textPrimary,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  imagePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.sm,
+    marginTop: SIZES.md,
+  },
+  imagePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 8,
+    borderRadius: SIZES.radiusMd,
+    backgroundColor: COLORS.primaryMuted + '25',
+  },
+  imagePickerText: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  removeImageBtn: {
+    backgroundColor: COLORS.error + '12',
+  },
+  removeImageText: {
+    color: COLORS.error,
+  },
+  entryPreview: {
+    height: 140,
+    borderRadius: SIZES.radiusMd,
+    marginTop: SIZES.sm,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.sm,
+    marginTop: SIZES.md,
+  },
+  modalBtn: {
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    borderRadius: SIZES.radiusMd,
+    backgroundColor: COLORS.backgroundCard,
+  },
+  modalBtnText: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  modalPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  modalPrimaryText: {
+    color: COLORS.white,
+  },
+  photoViewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoViewerImage: {
+    width: '90%',
+    height: '70%',
+    resizeMode: 'contain',
+  },
+  photoViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
