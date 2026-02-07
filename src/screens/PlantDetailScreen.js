@@ -11,6 +11,9 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  FlatList,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,7 +29,9 @@ const PlantDetailScreen = ({ route, navigation }) => {
   const [entryNote, setEntryNote] = useState('');
   const [entryPhoto, setEntryPhoto] = useState(null);
   const [isPhotoViewerVisible, setIsPhotoViewerVisible] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const photoItems = plant?.growthLog.filter((log) => log.photo) || [];
+  const screenWidth = Dimensions.get('window').width;
 
   // Refresh plant data from context
   const refreshPlant = () => {
@@ -255,7 +260,10 @@ const PlantDetailScreen = ({ route, navigation }) => {
                 {log.photo && (
                   <TouchableOpacity
                     onPress={() => {
-                      setSelectedPhoto(log.photo);
+                      const index = photoItems.findIndex(
+                        (item) => item._id === log._id
+                      );
+                      setSelectedPhotoIndex(Math.max(index, 0));
                       setIsPhotoViewerVisible(true);
                     }}
                   >
@@ -284,7 +292,10 @@ const PlantDetailScreen = ({ route, navigation }) => {
                   key={log._id}
                   style={styles.photoGridItem}
                   onPress={() => {
-                    setSelectedPhoto(log.photo);
+                    const index = photoItems.findIndex(
+                      (item) => item._id === log._id
+                    );
+                    setSelectedPhotoIndex(Math.max(index, 0));
                     setIsPhotoViewerVisible(true);
                   }}
                 >
@@ -386,18 +397,42 @@ const PlantDetailScreen = ({ route, navigation }) => {
         onRequestClose={() => setIsPhotoViewerVisible(false)}
       >
         <View style={styles.photoViewerBackdrop}>
+          <FlatList
+            data={photoItems}
+            keyExtractor={(item) => item._id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={selectedPhotoIndex}
+            getItemLayout={(_, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.photoViewerPage, { width: screenWidth }]}
+                onPress={() => setIsPhotoViewerVisible(false)}
+              >
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => {}}
+                  style={styles.photoFrame}
+                >
+                  <Image
+                    source={{ uri: item.photo }}
+                    style={styles.photoViewerImage}
+                  />
+                </TouchableOpacity>
+              </Pressable>
+            )}
+          />
           <TouchableOpacity
             style={styles.photoViewerClose}
             onPress={() => setIsPhotoViewerVisible(false)}
           >
             <Ionicons name="close" size={24} color={COLORS.white} />
           </TouchableOpacity>
-          {selectedPhoto ? (
-            <Image
-              source={{ uri: selectedPhoto }}
-              style={styles.photoViewerImage}
-            />
-          ) : null}
         </View>
       </Modal>
     </ScrollView>
@@ -710,9 +745,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoViewerImage: {
+  photoViewerPage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoFrame: {
     width: '90%',
     height: '70%',
+  },
+  photoViewerImage: {
+    width: '100%',
+    height: '100%',
     resizeMode: 'contain',
   },
   photoViewerClose: {
