@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Garden Tracker",
+    "slug": "garden-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#2D5A3D"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2D5A3D"
+      }
+    },
+    "plugins": [
+      "expo-image-picker",
+      "expo-asset"
+    ]
+  }
+}
