@@ -74,10 +74,20 @@ export const GardenProvider = ({ children }) => {
 
   const addPlant = (newPlant) => {
     // Future: POST /api/plants
+    const initialLog = newPlant.initialPhoto
+      ? [
+          {
+            _id: `log_${Date.now()}`,
+            date: new Date().toISOString().split('T')[0],
+            photo: newPlant.initialPhoto,
+            note: newPlant.initialNote || 'Initial photo',
+          },
+        ]
+      : [];
     const plant = {
       ...newPlant,
       _id: `plant_${Date.now()}`,
-      growthLog: [],
+      growthLog: initialLog,
       datePlanted: new Date().toISOString().split('T')[0],
     };
     setPlants((prev) => [...prev, plant]);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
@@ -48,9 +54,74 @@ const PlantCard = ({ plant, onPress }) => {
 
 const CategoryScreen = ({ route, navigation }) => {
   const { areaId, categoryId, categoryName } = route.params;
-  const { getPlantsForAreaAndCategory, categories } = useGarden();
+  const { getPlantsForAreaAndCategory, categories, addPlant } = useGarden();
   const plants = getPlantsForAreaAndCategory(areaId, categoryId);
   const category = categories.find((c) => c._id === categoryId);
+  const [isPlantModalVisible, setIsPlantModalVisible] = useState(false);
+  const [plantForm, setPlantForm] = useState({ name: '', description: '' });
+  const [plantPhoto, setPlantPhoto] = useState(null);
+
+  const openNewPlant = () => {
+    setPlantForm({ name: '', description: '' });
+    setPlantPhoto(null);
+    setIsPlantModalVisible(true);
+  };
+
+  const closePlantModal = () => {
+    setIsPlantModalVisible(false);
+  };
+
+  const handleSavePlant = () => {
+    const trimmedName = plantForm.name.trim();
+    if (!trimmedName) {
+      Alert.alert('Name required', 'Please enter a plant name.');
+      return;
+    }
+
+    addPlant({
+      name: trimmedName,
+      description: plantForm.description.trim(),
+      area: areaId,
+      category: categoryId,
+      initialPhoto: plantPhoto,
+    });
+
+    setIsPlantModalVisible(false);
+  };
+
+  const pickPlantImage = async (source) => {
+    const permissionResult =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Permission needed',
+        source === 'camera'
+          ? 'Camera access is required to take plant photos.'
+          : 'Photo library access is required to choose photos.'
+      );
+      return;
+    }
+
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+
+    if (!result.canceled && result.assets?.length) {
+      setPlantPhoto(result.assets[0].uri);
+    }
+  };
 
   return (
     <ScrollView
@@ -77,7 +148,7 @@ const CategoryScreen = ({ route, navigation }) => {
           <Text style={styles.emptySubtitle}>
             Add your first {categoryName?.toLowerCase()} to start tracking!
           </Text>
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity style={styles.addButton} onPress={openNewPlant}>
             <Ionicons name="add" size={20} color={COLORS.white} />
             <Text style={styles.addButtonText}>Add Plant</Text>
           </TouchableOpacity>
@@ -98,7 +169,11 @@ const CategoryScreen = ({ route, navigation }) => {
           ))}
 
           {/* Add plant card */}
-          <TouchableOpacity style={styles.addPlantCard} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.addPlantCard}
+            activeOpacity={0.7}
+            onPress={openNewPlant}
+          >
             <Ionicons name="add-circle" size={36} color={COLORS.textLight} />
             <Text style={styles.addPlantText}>Add Plant</Text>
           </TouchableOpacity>
@@ -106,6 +181,96 @@ const CategoryScreen = ({ route, navigation }) => {
       )}
 
       <View style={{ height: 40 }} />
+
+      <Modal
+        visible={isPlantModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closePlantModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>New Plant</Text>
+            <Text style={styles.inputLabel}>Name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={plantForm.name}
+              onChangeText={(text) =>
+                setPlantForm((prev) => ({ ...prev, name: text }))
+              }
+              placeholder="e.g. Rosemary"
+              placeholderTextColor={COLORS.textLight}
+            />
+
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={plantForm.description}
+              onChangeText={(text) =>
+                setPlantForm((prev) => ({ ...prev, description: text }))
+              }
+              placeholder="Short description"
+              placeholderTextColor={COLORS.textLight}
+              multiline
+            />
+
+            <Text style={styles.inputLabel}>Photo</Text>
+            <View style={styles.imagePickerRow}>
+              <TouchableOpacity
+                style={styles.imagePickerBtn}
+                onPress={() => pickPlantImage('camera')}
+              >
+                <Ionicons name="camera" size={18} color={COLORS.primary} />
+                <Text style={styles.imagePickerText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.imagePickerBtn}
+                onPress={() => pickPlantImage('gallery')}
+              >
+                <Ionicons name="images" size={18} color={COLORS.primary} />
+                <Text style={styles.imagePickerText}>Gallery</Text>
+              </TouchableOpacity>
+              {plantPhoto ? (
+                <TouchableOpacity
+                  style={[styles.imagePickerBtn, styles.removeImageBtn]}
+                  onPress={() => setPlantPhoto(null)}
+                >
+                  <Ionicons name="close" size={18} color={COLORS.error} />
+                  <Text
+                    style={[styles.imagePickerText, styles.removeImageText]}
+                  >
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {plantPhoto ? (
+              <Image source={{ uri: plantPhoto }} style={styles.photoPreview} />
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={closePlantModal}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalPrimary]}
+                onPress={handleSavePlant}
+              >
+                <Text style={[styles.modalBtnText, styles.modalPrimaryText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 };
@@ -238,6 +403,96 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: SIZES.fontMd,
     fontWeight: '600',
+    color: COLORS.white,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: SIZES.lg,
+  },
+  modalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.radiusLg,
+    padding: SIZES.lg,
+  },
+  modalTitle: {
+    fontSize: SIZES.fontLg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SIZES.md,
+  },
+  inputLabel: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    marginTop: SIZES.sm,
+  },
+  textInput: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    fontSize: SIZES.fontSm,
+    color: COLORS.textPrimary,
+  },
+  textArea: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.sm,
+    marginTop: SIZES.md,
+  },
+  imagePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.sm,
+    marginTop: SIZES.xs,
+  },
+  imagePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 8,
+    borderRadius: SIZES.radiusMd,
+    backgroundColor: COLORS.primaryMuted + '25',
+  },
+  imagePickerText: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  removeImageBtn: {
+    backgroundColor: COLORS.error + '12',
+  },
+  removeImageText: {
+    color: COLORS.error,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: SIZES.radiusMd,
+    marginTop: SIZES.sm,
+  },
+  modalBtn: {
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 10,
+    borderRadius: SIZES.radiusMd,
+    backgroundColor: COLORS.backgroundCard,
+  },
+  modalBtnText: {
+    fontSize: SIZES.fontSm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  modalPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  modalPrimaryText: {
     color: COLORS.white,
   },
 });
