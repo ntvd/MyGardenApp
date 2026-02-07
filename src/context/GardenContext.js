@@ -16,7 +16,7 @@ export const useGarden = () => {
 };
 
 export const GardenProvider = ({ children }) => {
-  const [areas] = useState(initialAreas);
+  const [areas, setAreas] = useState(initialAreas);
   const [categories] = useState(initialCategories);
   const [plants, setPlants] = useState(initialPlants);
 
@@ -71,6 +71,32 @@ export const GardenProvider = ({ children }) => {
     return plant;
   };
 
+  const addArea = (newArea) => {
+    const area = {
+      _id: `area_${Date.now()}`,
+      name: newArea.name,
+      description: newArea.description,
+      emoji: newArea.emoji || '🌿',
+      coverColor: newArea.coverColor || '#7CB342',
+      coverImage: newArea.coverImage || null,
+    };
+    setAreas((prev) => [area, ...prev]);
+    return area;
+  };
+
+  const updateArea = (areaId, updates) => {
+    setAreas((prev) =>
+      prev.map((area) =>
+        area._id === areaId ? { ...area, ...updates } : area
+      )
+    );
+  };
+
+  const deleteArea = (areaId) => {
+    setAreas((prev) => prev.filter((area) => area._id !== areaId));
+    setPlants((prev) => prev.filter((plant) => plant.area !== areaId));
+  };
+
   // Get all recent growth logs across all plants (for the capture feed)
   const getRecentGrowthLogs = () => {
     const allLogs = [];
@@ -98,6 +124,9 @@ export const GardenProvider = ({ children }) => {
         getCategoriesForArea,
         addGrowthLog,
         addPlant,
+        addArea,
+        updateArea,
+        deleteArea,
         getRecentGrowthLogs,
       }}
     >
