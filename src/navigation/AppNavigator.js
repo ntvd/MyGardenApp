@@ -30,13 +30,13 @@ const AppNavigator = () => {
       }}
     >
       <Tab.Screen
-        name="CaptureTab"
-        component={CaptureScreen}
+        name="HomeTab"
+        component={HomeStack}
         options={{
-          tabBarLabel: 'Capture',
+          tabBarLabel: 'Home',
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
-              name={focused ? 'camera' : 'camera-outline'}
+              name={focused ? 'leaf' : 'leaf-outline'}
               focused={focused}
               color={color}
               size={24}
@@ -45,13 +45,13 @@ const AppNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="HomeTab"
-        component={HomeStack}
+        name="CaptureTab"
+        component={CaptureScreen}
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Capture',
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
-              name={focused ? 'leaf' : 'leaf-outline'}
+              name={focused ? 'camera' : 'camera-outline'}
               focused={focused}
               color={color}
               size={24}
