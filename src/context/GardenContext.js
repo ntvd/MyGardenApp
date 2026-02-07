@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as Notifications from 'expo-notifications';
 import {
   GARDEN_AREAS as initialAreas,
   CATEGORIES as initialCategories,
@@ -19,6 +20,17 @@ export const GardenProvider = ({ children }) => {
   const [areas, setAreas] = useState(initialAreas);
   const [categories, setCategories] = useState(initialCategories);
   const [plants, setPlants] = useState(initialPlants);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(() => {
+      setNotificationCount((prev) => prev + 1);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(subscription);
+    };
+  }, []);
 
   // ---- Future: replace these with API calls to Node.js backend ----
 
@@ -134,6 +146,10 @@ export const GardenProvider = ({ children }) => {
     setPlants((prev) => prev.filter((plant) => plant.area !== areaId));
   };
 
+  const clearNotificationCount = () => {
+    setNotificationCount(0);
+  };
+
   // Get all recent growth logs across all plants (for the capture feed)
   const getRecentGrowthLogs = () => {
     const allLogs = [];
@@ -167,6 +183,8 @@ export const GardenProvider = ({ children }) => {
         addArea,
         updateArea,
         deleteArea,
+        notificationCount,
+        clearNotificationCount,
         getRecentGrowthLogs,
       }}
     >

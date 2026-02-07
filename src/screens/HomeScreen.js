@@ -26,6 +26,8 @@ const HomeScreen = ({ navigation }) => {
     addArea,
     updateArea,
     deleteArea,
+    notificationCount,
+    clearNotificationCount,
   } = useGarden();
   const recentLogs = getRecentGrowthLogs().slice(0, 3);
   const [isAreaModalVisible, setIsAreaModalVisible] = useState(false);
@@ -146,12 +148,25 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.greeting}>Good morning 🌱</Text>
             <Text style={styles.title}>My Garden</Text>
           </View>
-          <TouchableOpacity style={styles.settingsBtn}>
-            <Ionicons
-              name="settings-outline"
-              size={22}
-              color={COLORS.textSecondary}
-            />
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => {
+              clearNotificationCount();
+              navigation.navigate('ProfileTab', { screen: 'Reminders' });
+            }}
+          >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={COLORS.textSecondary}
+              />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificationCount}
+                  </Text>
+                </View>
+              )}
           </TouchableOpacity>
         </View>
 
@@ -454,6 +469,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: COLORS.error,
+    fontSize: 10,
+    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',

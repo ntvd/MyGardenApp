@@ -133,11 +133,32 @@ const RemindersScreen = () => {
 
     try {
       // Schedule a repeating notification
-      const trigger = {
-        type: 'timeInterval',
-        seconds: selectedFrequency.seconds,
-        repeats: true,
-      };
+      const trigger =
+        selectedFrequency.id === 'daily'
+          ? {
+              hour: selectedTime.hour,
+              minute: 0,
+              repeats: true,
+            }
+          : selectedFrequency.id === 'weekly'
+          ? {
+              weekday: new Date().getDay() + 1,
+              hour: selectedTime.hour,
+              minute: 0,
+              repeats: true,
+            }
+          : selectedFrequency.id === 'monthly'
+          ? {
+              day: new Date().getDate(),
+              hour: selectedTime.hour,
+              minute: 0,
+              repeats: true,
+            }
+          : {
+              type: 'timeInterval',
+              seconds: selectedFrequency.seconds,
+              repeats: true,
+            };
 
       const id = await Notifications.scheduleNotificationAsync({
         content: {
