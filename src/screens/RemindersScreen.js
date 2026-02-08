@@ -59,8 +59,10 @@ const RemindersScreen = () => {
   const [showPlantPicker, setShowPlantPicker] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
 
-  // plantScope: 'all' | { type: 'area', area } | { type: 'plants', plants: [] }
-  const [plantScope, setPlantScope] = useState('all');
+  // Selection state: tracks selected areas and individual plants separately
+  const [selectedAll, setSelectedAll] = useState(true);
+  const [selectedAreaIds, setSelectedAreaIds] = useState([]);
+  const [selectedPlants, setSelectedPlants] = useState([]);
 
   // New reminder form state
   const [reminderTitle, setReminderTitle] = useState('');
@@ -104,6 +106,7 @@ const RemindersScreen = () => {
         plantId: notif.content.data?.plantId || null,
         plantIds: notif.content.data?.plantIds || null,
         areaId: notif.content.data?.areaId || null,
+        areaIds: notif.content.data?.areaIds || null,
         frequency: notif.content.data?.frequency || 'daily',
         timeLabel: notif.content.data?.timeLabel || 'Morning',
         title: notif.content.title,
@@ -117,44 +120,74 @@ const RemindersScreen = () => {
 
   const resetForm = () => {
     setReminderTitle('');
-    setPlantScope('all');
+    setSelectedAll(true);
+    setSelectedAreaIds([]);
+    setSelectedPlants([]);
     setSelectedFrequency(null);
     setSelectedTime(TIME_OPTIONS[0]);
     setCustomNote('');
     setEditingReminderId(null);
   };
 
-  const getPlantScopeLabel = () => {
-    if (plantScope === 'all') return 'All plants';
-    if (plantScope.type === 'area') return plantScope.area.name;
-    if (plantScope.type === 'plants' && plantScope.plants.length > 0) {
-      return plantScope.plants.length === 1
-        ? plantScope.plants[0].name
-        : `${plantScope.plants.length} plants`;
+  const toggleAll = () => {
+    if (selectedAll) {
+      setSelectedAll(false);
+    } else {
+      setSelectedAll(true);
+      setSelectedAreaIds([]);
+      setSelectedPlants([]);
     }
-    return 'Choose plant(s)';
   };
 
-  const getPlantScopeDataForNotification = () => {
-    if (plantScope === 'all')
-      return { plantName: 'General', plantId: null, plantIds: null, areaId: null };
-    if (plantScope.type === 'area')
-      return {
-        plantName: plantScope.area.name,
-        plantId: null,
-        plantIds: null,
-        areaId: plantScope.area._id,
-      };
-    if (plantScope.type === 'plants' && plantScope.plants.length > 0) {
-      const names = plantScope.plants.map((p) => p.name).join(', ');
-      return {
-        plantName: names,
-        plantId: plantScope.plants[0]._id,
-        plantIds: plantScope.plants.map((p) => p._id),
-        areaId: null,
-      };
+  const toggleArea = (areaId) => {
+    setSelectedAll(false);
+    setSelectedAreaIds((prev) =>
+      prev.includes(areaId)
+        ? prev.filter((id) => id !== areaId)
+        : [...prev, areaId]
+    );
+  };
+
+  const addPickedPlants = (plants) => {
+    setSelectedAll(false);
+    setSelectedPlants((prev) => {
+      const existingIds = prev.map((p) => p._id);
+      const newPlants = plants.filter((p) => !existingIds.includes(p._id));
+      return [...prev, ...newPlants];
+    });
+  };
+
+  const removePickedPlant = (plantId) => {
+    setSelectedPlants((prev) => prev.filter((p) => p._id !== plantId));
+  };
+
+  const getScopeLabel = () => {
+    const parts = [];
+    if (selectedAll) return 'All plants';
+    selectedAreaIds.forEach((id) => {
+      const area = areas.find((a) => a._id === id);
+      if (area) parts.push(area.name);
+    });
+    selectedPlants.forEach((p) => parts.push(p.name));
+    return parts.length > 0 ? parts.join(', ') : 'None selected';
+  };
+
+  const getScopeDataForNotification = () => {
+    if (selectedAll || (selectedAreaIds.length === 0 && selectedPlants.length === 0)) {
+      return { plantName: 'General', plantId: null, plantIds: null, areaIds: null };
     }
-    return { plantName: 'General', plantId: null, plantIds: null, areaId: null };
+    const names = [];
+    selectedAreaIds.forEach((id) => {
+      const area = areas.find((a) => a._id === id);
+      if (area) names.push(area.name);
+    });
+    selectedPlants.forEach((p) => names.push(p.name));
+    return {
+      plantName: names.join(', '),
+      plantId: selectedPlants.length > 0 ? selectedPlants[0]._id : null,
+      plantIds: selectedPlants.length > 0 ? selectedPlants.map((p) => p._id) : null,
+      areaIds: selectedAreaIds.length > 0 ? selectedAreaIds : null,
+    };
   };
 
   const openForEdit = (reminder) => {
@@ -170,16 +203,20 @@ const RemindersScreen = () => {
       }
     }
     if (!Array.isArray(plantIds)) plantIds = [];
-    const areaId = reminder.areaId;
-    if (areaId) {
-      const area = areas.find((a) => a._id === areaId);
-      if (area) setPlantScope({ type: 'area', area });
-      else setPlantScope('all');
-    } else if (plantIds.length > 0) {
+    
+    let areaIds = reminder.areaIds || (reminder.areaId ? [reminder.areaId] : []);
+    if (!Array.isArray(areaIds)) areaIds = [];
+
+    if (areaIds.length === 0 && plantIds.length === 0) {
+      setSelectedAll(true);
+      setSelectedAreaIds([]);
+      setSelectedPlants([]);
+    } else {
+      setSelectedAll(false);
+      setSelectedAreaIds(areaIds);
       const plist = plantIds.map((id) => getPlantById(id)).filter(Boolean);
-      if (plist.length > 0) setPlantScope({ type: 'plants', plants: plist });
-      else setPlantScope('all');
-    } else setPlantScope('all');
+      setSelectedPlants(plist);
+    }
     setSelectedFrequency(
       FREQUENCY_OPTIONS.find((f) => f.id === reminder.frequency) ||
         FREQUENCY_OPTIONS[0]
@@ -204,7 +241,7 @@ const RemindersScreen = () => {
       return;
     }
 
-    const scopeData = getPlantScopeDataForNotification();
+    const scopeData = getScopeDataForNotification();
     const title = titleText.startsWith('🌱') ? titleText : `🌱 ${titleText}`;
     const body = customNote.trim();
 
@@ -229,7 +266,7 @@ const RemindersScreen = () => {
             plantName: scopeData.plantName,
             plantId: scopeData.plantId,
             plantIds: scopeData.plantIds,
-            areaId: scopeData.areaId,
+            areaIds: scopeData.areaIds,
             frequency: selectedFrequency.id,
             timeLabel: selectedTime.label,
           },
@@ -341,72 +378,83 @@ const RemindersScreen = () => {
 
           {/* Plant / Area Selector */}
           <Text style={styles.formLabel}>Which plant or area? (optional)</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.plantScrollContent}
-          >
+          <View style={styles.chipWrap}>
+            {/* All Plants chip — toggle on/off */}
             <TouchableOpacity
               style={[
                 styles.plantChip,
-                plantScope === 'all' && styles.plantChipSelected,
+                selectedAll && styles.plantChipSelected,
               ]}
-              onPress={() => setPlantScope('all')}
+              onPress={toggleAll}
             >
               <Text
                 style={[
                   styles.plantChipText,
-                  plantScope === 'all' && styles.plantChipTextSelected,
+                  selectedAll && styles.plantChipTextSelected,
                 ]}
               >
-                All plants
+                Whole garden
               </Text>
+              {selectedAll && (
+                <View style={styles.chipClose}>
+                  <Ionicons name="close" size={10} color={COLORS.background} />
+                </View>
+              )}
             </TouchableOpacity>
+
+            {/* Area chips — toggle on/off */}
             {areas.map((area) => {
-              const selected =
-                plantScope.type === 'area' && plantScope.area._id === area._id;
+              const isSelected = selectedAreaIds.includes(area._id);
               return (
                 <TouchableOpacity
                   key={area._id}
-                  style={[styles.plantChip, selected && styles.plantChipSelected]}
-                  onPress={() => setPlantScope({ type: 'area', area })}
+                  style={[styles.plantChip, isSelected && styles.plantChipSelected]}
+                  onPress={() => toggleArea(area._id)}
                 >
                   <Text
                     style={[
                       styles.plantChipText,
-                      selected && styles.plantChipTextSelected,
+                      isSelected && styles.plantChipTextSelected,
                     ]}
                   >
                     {area.name}
                   </Text>
+                  {isSelected && (
+                    <View style={styles.chipClose}>
+                      <Ionicons name="close" size={10} color={COLORS.background} />
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
+
+            {/* Individual plant chips with X to remove */}
+            {selectedPlants.map((plant) => (
+              <TouchableOpacity
+                key={plant._id}
+                style={[styles.plantChip, styles.plantChipSelected]}
+                onPress={() => removePickedPlant(plant._id)}
+              >
+                <Text style={[styles.plantChipText, styles.plantChipTextSelected]}>
+                  {plant.name}
+                </Text>
+                <View style={styles.chipClose}>
+                  <Ionicons name="close" size={10} color={COLORS.background} />
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {/* Choose plant(s) button — always visible */}
             <TouchableOpacity
-              style={[
-                styles.plantChip,
-                plantScope.type === 'plants' && styles.plantChipSelected,
-              ]}
+              style={[styles.plantChip, styles.choosePlantBtn]}
               onPress={() => setShowPlantPicker(true)}
             >
-              <Text
-                style={[
-                  styles.plantChipText,
-                  plantScope.type === 'plants' &&
-                    styles.plantChipTextSelected,
-                ]}
-              >
-                {plantScope.type === 'plants' && plantScope.plants.length > 0
-                  ? getPlantScopeLabel()
-                  : 'Choose plant(s)'}
+              <Ionicons name="add" size={16} color={COLORS.primary} />
+              <Text style={[styles.plantChipText, { color: COLORS.primary }]}>
+                Choose plant(s)
               </Text>
             </TouchableOpacity>
-          </ScrollView>
-          {plantScope.type === 'plants' && plantScope.plants.length > 1 && (
-            <Text style={styles.selectedPlantsHint} numberOfLines={1}>
-              {plantScope.plants.map((p) => p.name).join(', ')}
-            </Text>
-          )}
+          </View>
 
           {/* Frequency */}
           <Text style={styles.formLabel}>How often?</Text>
@@ -487,12 +535,8 @@ const RemindersScreen = () => {
               visible
               asOverlay
               onClose={() => setShowPlantPicker(false)}
-              onDone={(selected) => {
-                setPlantScope(
-                  selected.length > 0
-                    ? { type: 'plants', plants: selected }
-                    : 'all'
-                );
+              onDone={(picked) => {
+                addPickedPlants(picked);
                 setShowPlantPicker(false);
               }}
               multiSelect
@@ -900,11 +944,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.lg,
     gap: SIZES.sm,
   },
-  selectedPlantsHint: {
-    fontSize: SIZES.fontSm,
-    color: COLORS.textLight,
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: SIZES.lg,
-    marginTop: SIZES.xs,
+    gap: SIZES.sm,
+  },
+  chipClose: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#999',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choosePlantBtn: {
+    borderStyle: 'dashed',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '08',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   plantChip: {
     paddingHorizontal: SIZES.md,
