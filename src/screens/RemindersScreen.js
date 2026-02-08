@@ -321,8 +321,12 @@ const RemindersScreen = () => {
     <Modal
       visible={showCreateModal}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={showPlantPicker ? 'fullScreen' : 'pageSheet'}
       onRequestClose={() => {
+        if (showPlantPicker) {
+          setShowPlantPicker(false);
+          return;
+        }
         setShowCreateModal(false);
         resetForm();
       }}
