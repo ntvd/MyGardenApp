@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import PlantPickerModal from '../components/PlantPickerModal';
 
 // Configure how notifications appear when app is in foreground
@@ -45,12 +46,19 @@ const FREQUENCY_OPTIONS = [
   { id: 'monthly', label: 'Every month', seconds: 2592000 },
 ];
 
-const TIME_SLOT_OPTIONS = [
-  { id: 'morning', label: 'Morning', hour: 8, minute: 0 },
-  { id: 'noon', label: 'Noon', hour: 12, minute: 0 },
-  { id: 'afternoon', label: 'Afternoon', hour: 15, minute: 0 },
-  { id: 'evening', label: 'Evening', hour: 18, minute: 0 },
-];
+const createTimeDate = (hour = 8, minute = 0) => {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d;
+};
+
+const formatTimeLabel = (date) => {
+  let h = date.getHours();
+  const m = date.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+};
 
 const RemindersScreen = () => {
   const { plants, areas, getPlantById } = useGarden();
@@ -67,7 +75,7 @@ const RemindersScreen = () => {
   // New reminder form state
   const [reminderTitle, setReminderTitle] = useState('');
   const [selectedFrequency, setSelectedFrequency] = useState(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('morning');
+  const [selectedTime, setSelectedTime] = useState(() => createTimeDate(8, 0));
   const [customNote, setCustomNote] = useState('');
   const [editingReminderId, setEditingReminderId] = useState(null);
   const modalScrollRef = useRef(null);
@@ -126,7 +134,7 @@ const RemindersScreen = () => {
     setSelectedAreaIds([]);
     setSelectedPlants([]);
     setSelectedFrequency(null);
-    setSelectedTimeSlot('morning');
+    setSelectedTime(createTimeDate(8, 0));
     setCustomNote('');
     setEditingReminderId(null);
   };
@@ -223,15 +231,7 @@ const RemindersScreen = () => {
       FREQUENCY_OPTIONS.find((f) => f.id === reminder.frequency) ||
         FREQUENCY_OPTIONS[0]
     );
-    const h = reminder.hour ?? 8;
-    const m = reminder.minute ?? 0;
-    const slot = TIME_SLOT_OPTIONS.reduce((best, s) =>
-      Math.abs(s.hour * 60 + s.minute - (h * 60 + m)) <
-      Math.abs(best.hour * 60 + best.minute - (h * 60 + m))
-        ? s
-        : best
-    );
-    setSelectedTimeSlot(slot.id);
+    setSelectedTime(createTimeDate(reminder.hour ?? 8, reminder.minute ?? 0));
     setCustomNote(reminder.body || '');
     setEditingReminderId(reminder.id);
     setShowCreateModal(true);
@@ -275,9 +275,9 @@ const RemindersScreen = () => {
             plantIds: scopeData.plantIds,
             areaIds: scopeData.areaIds,
             frequency: selectedFrequency.id,
-            timeLabel: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).label,
-            hour: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).hour,
-            minute: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).minute,
+            timeLabel: formatTimeLabel(selectedTime),
+            hour: selectedTime.getHours(),
+            minute: selectedTime.getMinutes(),
           },
         },
         trigger,
@@ -504,26 +504,18 @@ const RemindersScreen = () => {
 
           {/* Preferred time */}
           <Text style={styles.formLabel}>Preferred time</Text>
-          <View style={styles.timeRow}>
-            {TIME_SLOT_OPTIONS.map((slot) => (
-              <TouchableOpacity
-                key={slot.id}
-                style={[
-                  styles.timeChip,
-                  selectedTimeSlot === slot.id && styles.timeChipSelected,
-                ]}
-                onPress={() => setSelectedTimeSlot(slot.id)}
-              >
-                <Text
-                  style={[
-                    styles.timeChipText,
-                    selectedTimeSlot === slot.id && styles.timeChipTextSelected,
-                  ]}
-                >
-                  {slot.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.timePickerContainer}>
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              display="spinner"
+              themeVariant="light"
+              textColor={COLORS.textPrimary}
+              onChange={(event, date) => {
+                if (date) setSelectedTime(date);
+              }}
+              style={styles.timePicker}
+            />
           </View>
 
           {/* Custom Note */}
@@ -1028,33 +1020,18 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '600',
   },
-  timeRow: {
-    flexDirection: 'row',
-    paddingHorizontal: SIZES.lg,
-    gap: SIZES.sm,
+  timePickerContainer: {
+    marginHorizontal: SIZES.lg,
     marginBottom: SIZES.sm,
-  },
-  timeChip: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: SIZES.sm + 2,
-    borderRadius: SIZES.radiusMd,
     backgroundColor: COLORS.backgroundCard,
-    borderWidth: 1.5,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: 'hidden',
   },
-  timeChipSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '10',
-  },
-  timeChipText: {
-    fontSize: SIZES.fontSm,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-  },
-  timeChipTextSelected: {
-    color: COLORS.primary,
-    fontWeight: '600',
+  timePicker: {
+    height: 160,
+    width: '100%',
   },
   titleInput: {
     marginHorizontal: SIZES.lg,
