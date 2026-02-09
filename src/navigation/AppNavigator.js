@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import HomeStack from './HomeStack';
 import CaptureScreen from '../screens/CaptureScreen';
+import ActionsScreen from '../screens/ActionsScreen';
 import ProfileStack from './ProfileStack';
 import { COLORS, SIZES } from '../theme';
 
@@ -52,6 +53,21 @@ const AppNavigator = () => {
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               name={focused ? 'camera' : 'camera-outline'}
+              focused={focused}
+              color={color}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ActionsTab"
+        component={ActionsScreen}
+        options={{
+          tabBarLabel: 'Actions',
+          tabBarIcon: ({ focused, color, size }) => (
+            <TabIcon
+              name={focused ? 'flash' : 'flash-outline'}
               focused={focused}
               color={color}
               size={24}

@@ -20,9 +20,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
 
+const EVENT_TYPE_INFO = {
+  water: { label: 'Watered', icon: 'water', color: '#3498DB' },
+  fertilize: { label: 'Fertilized', icon: 'leaf', color: '#27AE60' },
+  prune: { label: 'Pruned', icon: 'cut', color: '#E67E22' },
+  harvest: { label: 'Harvested', icon: 'basket', color: '#E74C3C' },
+  weed: { label: 'Weeded', icon: 'leaf-outline', color: '#95A5A6' },
+  other: { label: 'Other', icon: 'create', color: '#9B59B6' },
+};
+
 const PlantDetailScreen = ({ route, navigation }) => {
   const { plantId } = route.params;
-  const { getPlantById, addGrowthLog, deleteGrowthLog, deletePlant } =
+  const { getPlantById, addGrowthLog, deleteGrowthLog, deletePlant, getEventsForPlant } =
     useGarden();
   const [plant, setPlantState] = useState(getPlantById(plantId));
   const [isEntryModalVisible, setIsEntryModalVisible] = useState(false);
@@ -32,6 +41,17 @@ const PlantDetailScreen = ({ route, navigation }) => {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const photoItems = plant?.growthLog.filter((log) => log.photo) || [];
   const screenWidth = Dimensions.get('window').width;
+  const plantEvents = getEventsForPlant(plantId);
+
+  const formatEventDateTime = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   // Refresh plant data from context
   const refreshPlant = () => {
@@ -277,6 +297,51 @@ const PlantDetailScreen = ({ route, navigation }) => {
               </View>
             </View>
           ))
+        )}
+      </View>
+
+      {/* Event feed (actions that apply to this plant) */}
+      <View style={styles.eventFeedSection}>
+        <Text style={styles.sectionTitle}>Event feed</Text>
+        {plantEvents.length === 0 ? (
+          <View style={styles.emptyTimeline}>
+            <Text style={styles.emptyText}>
+              No events for this plant yet. Add events from the Actions tab.
+            </Text>
+          </View>
+        ) : (
+          plantEvents.map((ev) => {
+            const typeInfo = EVENT_TYPE_INFO[ev.type] || EVENT_TYPE_INFO.other;
+            return (
+              <View key={ev._id} style={styles.eventFeedItem}>
+                <View
+                  style={[
+                    styles.eventFeedIcon,
+                    { backgroundColor: typeInfo.color + '20' },
+                  ]}
+                >
+                  <Ionicons
+                    name={typeInfo.icon}
+                    size={18}
+                    color={typeInfo.color}
+                  />
+                </View>
+                <View style={styles.eventFeedContent}>
+                  <Text style={styles.eventFeedLabel}>
+                    {ev.title || typeInfo.label}
+                  </Text>
+                  {ev.description ? (
+                    <Text style={styles.eventFeedDescription} numberOfLines={2}>
+                      {ev.description}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.eventFeedTime}>
+                    {formatEventDateTime(ev.createdAt)}
+                  </Text>
+                </View>
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -632,6 +697,46 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontSm,
     color: COLORS.textLight,
     textAlign: 'center',
+  },
+  eventFeedSection: {
+    paddingHorizontal: SIZES.lg,
+    marginTop: SIZES.lg,
+  },
+  eventFeedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    padding: SIZES.sm,
+    marginBottom: SIZES.xs,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  eventFeedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SIZES.sm,
+  },
+  eventFeedContent: {
+    flex: 1,
+  },
+  eventFeedLabel: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  eventFeedDescription: {
+    fontSize: SIZES.fontXs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  eventFeedTime: {
+    fontSize: SIZES.fontXs,
+    color: COLORS.textLight,
+    marginTop: 2,
   },
   photoGridSection: {
     paddingHorizontal: SIZES.lg,

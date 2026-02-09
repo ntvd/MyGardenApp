@@ -20,6 +20,7 @@ export const GardenProvider = ({ children }) => {
   const [areas, setAreas] = useState(initialAreas);
   const [categories, setCategories] = useState(initialCategories);
   const [plants, setPlants] = useState(initialPlants);
+  const [events, setEvents] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
@@ -158,6 +159,35 @@ export const GardenProvider = ({ children }) => {
     return new Set(varieties).size;
   };
 
+  // ---- Garden events (water, fertilize, etc.) ----
+  const addEvent = (eventPayload) => {
+    const event = {
+      _id: `event_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      ...eventPayload,
+    };
+    setEvents((prev) => [event, ...prev]);
+    return event;
+  };
+
+  const getAllEvents = () => {
+    return [...events].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+  };
+
+  const getEventsForPlant = (plantId) => {
+    const plant = plants.find((p) => p._id === plantId);
+    if (!plant) return [];
+    return events.filter((ev) => {
+      if (ev.areaId) return plant.area === ev.areaId;
+      if (ev.plantIds && ev.plantIds.length > 0)
+        return ev.plantIds.includes(plantId);
+      // No areaId and no plantIds = "All plants" → applies to every plant
+      return true;
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  };
+
   // Get all recent growth logs across all plants (for the capture feed)
   const getRecentGrowthLogs = () => {
     const allLogs = [];
@@ -171,6 +201,49 @@ export const GardenProvider = ({ children }) => {
       });
     });
     return allLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
+  // Combined recent activity: growth logs + events, sorted by date (newest first)
+  const getRecentActivity = () => {
+    const growthItems = getRecentGrowthLogs().map((log) => ({
+      type: 'growth',
+      sortDate: new Date(log.date),
+      plantId: log.plantId,
+      plantName: log.plantName,
+      ...log,
+    }));
+    const eventTypeLabels = {
+      water: 'Watered',
+      fertilize: 'Fertilized',
+      prune: 'Pruned',
+      harvest: 'Harvested',
+      weed: 'Weeded',
+      other: 'Other',
+    };
+    const eventItems = getAllEvents().map((ev) => {
+      let scopeLabel = 'All plants';
+      if (ev.areaId) {
+        const area = areas.find((a) => a._id === ev.areaId);
+        scopeLabel = area?.name || 'Area';
+      } else if (ev.plantIds && ev.plantIds.length > 0) {
+        const names = ev.plantIds
+          .map((id) => getPlantById(id)?.name)
+          .filter(Boolean);
+        scopeLabel = names.length === 1 ? names[0] : `${names.length} plants`;
+      }
+      return {
+        type: 'event',
+        sortDate: new Date(ev.createdAt),
+        eventType: ev.type,
+        eventLabel: ev.title || eventTypeLabels[ev.type] || 'Event',
+        description: ev.description,
+        scopeLabel,
+        ...ev,
+      };
+    });
+    return [...growthItems, ...eventItems].sort(
+      (a, b) => b.sortDate - a.sortDate
+    );
   };
 
   return (
@@ -194,7 +267,12 @@ export const GardenProvider = ({ children }) => {
         notificationCount,
         clearNotificationCount,
         getRecentGrowthLogs,
+        getRecentActivity,
         getUniqueVarietyCount,
+        events,
+        addEvent,
+        getAllEvents,
+        getEventsForPlant,
       }}
     >
       {children}

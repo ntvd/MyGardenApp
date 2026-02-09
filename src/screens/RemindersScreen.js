@@ -45,11 +45,11 @@ const FREQUENCY_OPTIONS = [
   { id: 'monthly', label: 'Every month', seconds: 2592000 },
 ];
 
-const TIME_OPTIONS = [
-  { id: 'morning', label: 'Morning (8 AM)', hour: 8 },
-  { id: 'noon', label: 'Noon (12 PM)', hour: 12 },
-  { id: 'afternoon', label: 'Afternoon (3 PM)', hour: 15 },
-  { id: 'evening', label: 'Evening (6 PM)', hour: 18 },
+const TIME_SLOT_OPTIONS = [
+  { id: 'morning', label: 'Morning', hour: 8, minute: 0 },
+  { id: 'noon', label: 'Noon', hour: 12, minute: 0 },
+  { id: 'afternoon', label: 'Afternoon', hour: 15, minute: 0 },
+  { id: 'evening', label: 'Evening', hour: 18, minute: 0 },
 ];
 
 const RemindersScreen = () => {
@@ -67,7 +67,7 @@ const RemindersScreen = () => {
   // New reminder form state
   const [reminderTitle, setReminderTitle] = useState('');
   const [selectedFrequency, setSelectedFrequency] = useState(null);
-  const [selectedTime, setSelectedTime] = useState(TIME_OPTIONS[0]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('morning');
   const [customNote, setCustomNote] = useState('');
   const [editingReminderId, setEditingReminderId] = useState(null);
   const modalScrollRef = useRef(null);
@@ -108,7 +108,9 @@ const RemindersScreen = () => {
         areaId: notif.content.data?.areaId || null,
         areaIds: notif.content.data?.areaIds || null,
         frequency: notif.content.data?.frequency || 'daily',
-        timeLabel: notif.content.data?.timeLabel || 'Morning',
+        timeLabel: notif.content.data?.timeLabel || '8:00 AM',
+        hour: notif.content.data?.hour ?? 8,
+        minute: notif.content.data?.minute ?? 0,
         title: notif.content.title,
         body: notif.content.body,
       }));
@@ -124,7 +126,7 @@ const RemindersScreen = () => {
     setSelectedAreaIds([]);
     setSelectedPlants([]);
     setSelectedFrequency(null);
-    setSelectedTime(TIME_OPTIONS[0]);
+    setSelectedTimeSlot('morning');
     setCustomNote('');
     setEditingReminderId(null);
   };
@@ -221,10 +223,15 @@ const RemindersScreen = () => {
       FREQUENCY_OPTIONS.find((f) => f.id === reminder.frequency) ||
         FREQUENCY_OPTIONS[0]
     );
-    setSelectedTime(
-      TIME_OPTIONS.find((t) => t.label === reminder.timeLabel) ||
-        TIME_OPTIONS[0]
+    const h = reminder.hour ?? 8;
+    const m = reminder.minute ?? 0;
+    const slot = TIME_SLOT_OPTIONS.reduce((best, s) =>
+      Math.abs(s.hour * 60 + s.minute - (h * 60 + m)) <
+      Math.abs(best.hour * 60 + best.minute - (h * 60 + m))
+        ? s
+        : best
     );
+    setSelectedTimeSlot(slot.id);
     setCustomNote(reminder.body || '');
     setEditingReminderId(reminder.id);
     setShowCreateModal(true);
@@ -268,7 +275,9 @@ const RemindersScreen = () => {
             plantIds: scopeData.plantIds,
             areaIds: scopeData.areaIds,
             frequency: selectedFrequency.id,
-            timeLabel: selectedTime.label,
+            timeLabel: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).label,
+            hour: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).hour,
+            minute: (TIME_SLOT_OPTIONS.find((s) => s.id === selectedTimeSlot) || TIME_SLOT_OPTIONS[0]).minute,
           },
         },
         trigger,
@@ -279,7 +288,7 @@ const RemindersScreen = () => {
       loadReminders();
       Alert.alert(
         editingReminderId ? 'Reminder Updated 🌱' : 'Reminder Set! 🌱',
-        `You'll be reminded: ${titleText} ${selectedFrequency.label.toLowerCase()}.`
+        `You'll be reminded ${selectedFrequency.label.toLowerCase()}.`
       );
     } catch (err) {
       console.log('Error scheduling:', err);
@@ -493,25 +502,25 @@ const RemindersScreen = () => {
             ))}
           </View>
 
-          {/* Time of Day */}
+          {/* Preferred time */}
           <Text style={styles.formLabel}>Preferred time</Text>
           <View style={styles.timeRow}>
-            {TIME_OPTIONS.map((time) => (
+            {TIME_SLOT_OPTIONS.map((slot) => (
               <TouchableOpacity
-                key={time.id}
+                key={slot.id}
                 style={[
                   styles.timeChip,
-                  selectedTime.id === time.id && styles.timeChipSelected,
+                  selectedTimeSlot === slot.id && styles.timeChipSelected,
                 ]}
-                onPress={() => setSelectedTime(time)}
+                onPress={() => setSelectedTimeSlot(slot.id)}
               >
                 <Text
                   style={[
                     styles.timeChipText,
-                    selectedTime.id === time.id && styles.timeChipTextSelected,
+                    selectedTimeSlot === slot.id && styles.timeChipTextSelected,
                   ]}
                 >
-                  {time.id.charAt(0).toUpperCase() + time.id.slice(1)}
+                  {slot.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -1023,6 +1032,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: SIZES.lg,
     gap: SIZES.sm,
+    marginBottom: SIZES.sm,
   },
   timeChip: {
     flex: 1,

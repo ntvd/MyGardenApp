@@ -23,7 +23,7 @@ const HomeScreen = ({ navigation }) => {
     areas,
     plants,
     categories,
-    getRecentGrowthLogs,
+    getRecentActivity,
     getUniqueVarietyCount,
     addArea,
     updateArea,
@@ -31,7 +31,16 @@ const HomeScreen = ({ navigation }) => {
     notificationCount,
     clearNotificationCount,
   } = useGarden();
-  const recentLogs = getRecentGrowthLogs().slice(0, 3);
+  const recentActivity = getRecentActivity().slice(0, 6);
+
+  const EVENT_TYPE_ICONS = {
+    water: 'water',
+    fertilize: 'leaf',
+    prune: 'cut',
+    harvest: 'basket',
+    weed: 'leaf-outline',
+    other: 'create',
+  };
   const [isAreaModalVisible, setIsAreaModalVisible] = useState(false);
   const [editingAreaId, setEditingAreaId] = useState(null);
   const [areaForm, setAreaForm] = useState({
@@ -263,7 +272,7 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Recent Activity</Text>
         </View>
         <View style={styles.activityContainer}>
-          {recentLogs.length === 0 ? (
+          {recentActivity.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons
                 name="leaf-outline"
@@ -275,37 +284,67 @@ const HomeScreen = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            recentLogs.map((log, index) => (
-              <TouchableOpacity
-                key={log._id}
-                style={[
-                  styles.activityItem,
-                  index < recentLogs.length - 1 && styles.activityBorder,
-                ]}
-                onPress={() =>
-                  navigation.navigate('PlantDetail', {
-                    plantId: log.plantId,
-                    plantName: log.plantName,
-                  })
-                }
-              >
-                <View style={styles.activityDot} />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityPlant}>{log.plantName}</Text>
-                  <Text style={styles.activityNote}>{log.note}</Text>
-                  <Text style={styles.activityDate}>{log.date}</Text>
-                </View>
-                {log.photo && (
-                  <View style={styles.activityThumb}>
+            recentActivity.map((item, index) =>
+              item.type === 'growth' ? (
+                <TouchableOpacity
+                  key={`log_${item._id}`}
+                  style={[
+                    styles.activityItem,
+                    index < recentActivity.length - 1 && styles.activityBorder,
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('PlantDetail', {
+                      plantId: item.plantId,
+                      plantName: item.plantName,
+                    })
+                  }
+                >
+                  <View style={styles.activityDot} />
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityPlant}>{item.plantName}</Text>
+                    <Text style={styles.activityNote}>{item.note}</Text>
+                    <Text style={styles.activityDate}>{item.date}</Text>
+                  </View>
+                  {item.photo && (
+                    <View style={styles.activityThumb}>
+                      <Ionicons
+                        name="image"
+                        size={16}
+                        color={COLORS.primaryMuted}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View
+                  key={`event_${item._id}`}
+                  style={[
+                    styles.activityItem,
+                    styles.activityItemEvent,
+                    index < recentActivity.length - 1 && styles.activityBorder,
+                  ]}
+                >
+                  <View style={styles.activityEventIcon}>
                     <Ionicons
-                      name="image"
+                      name={EVENT_TYPE_ICONS[item.eventType] || 'flash'}
                       size={16}
-                      color={COLORS.primaryMuted}
+                      color={COLORS.primary}
                     />
                   </View>
-                )}
-              </TouchableOpacity>
-            ))
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityPlant}>{item.eventLabel}</Text>
+                    {item.description ? (
+                      <Text style={styles.activityNote} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.activityDate}>
+                      {item.scopeLabel} · {item.sortDate.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+              )
+            )
           )}
         </View>
 
@@ -625,6 +664,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingVertical: SIZES.sm,
+  },
+  activityItemEvent: {
+    opacity: 1,
+  },
+  activityEventIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryMuted + '30',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SIZES.sm,
+    marginTop: 2,
   },
   activityBorder: {
     borderBottomWidth: 1,
