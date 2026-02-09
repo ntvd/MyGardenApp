@@ -147,7 +147,7 @@ const HomeScreen = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning 🌱</Text>
+            {/* Removed the "Good morning 🌱" text */}
             <Text style={styles.title}>My Garden</Text>
           </View>
           <TouchableOpacity
@@ -157,18 +157,18 @@ const HomeScreen = ({ navigation }) => {
               navigation.navigate('HomeNotifications');
             }}
           >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={COLORS.textSecondary}
-              />
-              {notificationCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {notificationCount}
-                  </Text>
-                </View>
-              )}
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={COLORS.textSecondary}
+            />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {notificationCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -259,7 +259,9 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Recent Activity */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+        </View>
         <View style={styles.activityContainer}>
           {recentLogs.length === 0 ? (
             <View style={styles.emptyState}>
@@ -447,7 +449,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: SIZES.lg,
     paddingTop: SIZES.lg,
     paddingBottom: SIZES.md,
@@ -470,7 +472,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
     position: 'relative',
   },
   notificationBadge: {
@@ -524,15 +525,13 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontLg,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: SIZES.md,
-    marginTop: SIZES.sm,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SIZES.lg,
-    marginBottom: SIZES.md,
+    marginBottom: SIZES.sm,
     marginTop: SIZES.sm,
   },
   addAreaBtn: {
@@ -615,6 +614,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundCard,
     borderRadius: SIZES.radiusLg,
     padding: SIZES.md,
+    marginBottom: SIZES.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
