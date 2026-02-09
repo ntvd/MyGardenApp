@@ -21,8 +21,10 @@ import { COLORS, SIZES } from '../theme';
 const HomeScreen = ({ navigation }) => {
   const {
     areas,
+    plants,
     categories,
     getRecentGrowthLogs,
+    getUniqueVarietyCount,
     addArea,
     updateArea,
     deleteArea,
@@ -177,11 +179,11 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.statLabel}>Areas</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{categories.length}</Text>
+            <Text style={styles.statNumber}>{getUniqueVarietyCount()}</Text>
             <Text style={styles.statLabel}>Varieties</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
+            <Text style={styles.statNumber}>{plants.length}</Text>
             <Text style={styles.statLabel}>Plants</Text>
           </View>
         </View>

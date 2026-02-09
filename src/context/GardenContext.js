@@ -150,6 +150,14 @@ export const GardenProvider = ({ children }) => {
     setNotificationCount(0);
   };
 
+  // Count unique non-empty varieties across all plants
+  const getUniqueVarietyCount = () => {
+    const varieties = plants
+      .map((p) => p.variety?.trim())
+      .filter(Boolean);
+    return new Set(varieties).size;
+  };
+
   // Get all recent growth logs across all plants (for the capture feed)
   const getRecentGrowthLogs = () => {
     const allLogs = [];
@@ -186,6 +194,7 @@ export const GardenProvider = ({ children }) => {
         notificationCount,
         clearNotificationCount,
         getRecentGrowthLogs,
+        getUniqueVarietyCount,
       }}
     >
       {children}

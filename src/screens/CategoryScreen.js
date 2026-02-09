@@ -58,11 +58,11 @@ const CategoryScreen = ({ route, navigation }) => {
   const plants = getPlantsForAreaAndCategory(areaId, categoryId);
   const category = categories.find((c) => c._id === categoryId);
   const [isPlantModalVisible, setIsPlantModalVisible] = useState(false);
-  const [plantForm, setPlantForm] = useState({ name: '', description: '' });
+  const [plantForm, setPlantForm] = useState({ name: '', variety: '', description: '' });
   const [plantPhoto, setPlantPhoto] = useState(null);
 
   const openNewPlant = () => {
-    setPlantForm({ name: '', description: '' });
+    setPlantForm({ name: '', variety: '', description: '' });
     setPlantPhoto(null);
     setIsPlantModalVisible(true);
   };
@@ -80,6 +80,7 @@ const CategoryScreen = ({ route, navigation }) => {
 
     addPlant({
       name: trimmedName,
+      variety: plantForm.variety.trim(),
       description: plantForm.description.trim(),
       area: areaId,
       category: categoryId,
@@ -202,6 +203,17 @@ const CategoryScreen = ({ route, navigation }) => {
                 setPlantForm((prev) => ({ ...prev, name: text }))
               }
               placeholder="e.g. Rosemary"
+              placeholderTextColor={COLORS.textLight}
+            />
+
+            <Text style={styles.inputLabel}>Variety <Text style={{ color: COLORS.textLight, fontWeight: '400' }}>(optional)</Text></Text>
+            <TextInput
+              style={styles.textInput}
+              value={plantForm.variety}
+              onChangeText={(text) =>
+                setPlantForm((prev) => ({ ...prev, variety: text }))
+              }
+              placeholder="e.g. Tuscan Blue"
               placeholderTextColor={COLORS.textLight}
             />
 

@@ -40,6 +40,7 @@ export const PLANTS = [
   {
     _id: 'plant_1',
     name: 'Cherry Tomato',
+    variety: 'Sun Gold',
     category: 'cat_2',
     area: 'area_2',
     description:
@@ -75,6 +76,7 @@ export const PLANTS = [
   {
     _id: 'plant_2',
     name: 'Basil',
+    variety: 'Genovese',
     category: 'cat_3',
     area: 'area_2',
     description:
@@ -98,6 +100,7 @@ export const PLANTS = [
   {
     _id: 'plant_3',
     name: 'Sunflower',
+    variety: 'Mammoth',
     category: 'cat_1',
     area: 'area_1',
     description:
@@ -127,6 +130,7 @@ export const PLANTS = [
   {
     _id: 'plant_4',
     name: 'Lavender',
+    variety: 'English',
     category: 'cat_1',
     area: 'area_1',
     description:
@@ -144,6 +148,7 @@ export const PLANTS = [
   {
     _id: 'plant_5',
     name: 'Mint',
+    variety: 'Spearmint',
     category: 'cat_3',
     area: 'area_3',
     description:
