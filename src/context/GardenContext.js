@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {
   GARDEN_AREAS as initialAreas,
@@ -7,6 +8,33 @@ import {
 } from '../data/mockData';
 
 const GardenContext = createContext();
+
+function parsePlantIds(plantIds) {
+  if (Array.isArray(plantIds)) return plantIds;
+  if (typeof plantIds === 'string') {
+    try {
+      const parsed = JSON.parse(plantIds);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function parseAreaId(areaId, areaIds) {
+  if (areaId) return areaId;
+  if (Array.isArray(areaIds) && areaIds.length > 0) return areaIds[0];
+  if (typeof areaIds === 'string') {
+    try {
+      const parsed = JSON.parse(areaIds);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 export const useGarden = () => {
   const context = useContext(GardenContext);
@@ -21,17 +49,89 @@ export const GardenProvider = ({ children }) => {
   const [categories, setCategories] = useState(initialCategories);
   const [plants, setPlants] = useState(initialPlants);
   const [events, setEvents] = useState([]);
-  const [notificationCount, setNotificationCount] = useState(0);
+  const [receivedNotifications, setReceivedNotifications] = useState([]);
 
+  // Foreground: add each received notification (unique id per delivery)
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(() => {
-      setNotificationCount((prev) => prev + 1);
-    });
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const req = notification.request;
+        const content = req?.content || {};
+        const data = content.data || {};
+        const identifier = req?.identifier || '';
+        const uniqueId = `${identifier}-${Date.now()}`;
+        const plantIds = parsePlantIds(data.plantIds);
+        const areaId = parseAreaId(data.areaId, data.areaIds);
+        setReceivedNotifications((prev) => [
+          ...prev,
+          {
+            id: uniqueId,
+            nativeIdentifier: identifier,
+            title: content.title || 'Reminder',
+            body: content.body || '',
+            plantName: (data && data.plantName) || 'General',
+            receivedAt: new Date().toISOString(),
+            plantIds,
+            areaId,
+          },
+        ]);
+      }
+    );
 
     return () => {
       Notifications.removeNotificationSubscription(subscription);
     };
   }, []);
+
+  const dismissReceivedNotification = async (id, nativeIdentifier) => {
+    if (nativeIdentifier) {
+      try {
+        await Notifications.dismissNotificationAsync(nativeIdentifier);
+      } catch (e) {}
+    }
+    setReceivedNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  // Set list to current tray only (replace, no merge) so we never accumulate old items or duplicates
+  const syncReceivedFromTray = async () => {
+    try {
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      const dateToSec = (d) =>
+        typeof d === 'number' ? (d < 1e12 ? d : Math.floor(d / 1000)) : 0;
+      const mapped = (presented || []).map((notif) => {
+        const req = notif.request;
+        const content = req?.content || {};
+        const data = content.data || {};
+        const identifier = req?.identifier || '';
+        const dateSec = dateToSec(notif.date != null ? notif.date : Date.now() / 1000);
+        const ms = dateSec * 1000;
+        const plantIds = parsePlantIds(data.plantIds);
+        const areaId = parseAreaId(data.areaId, data.areaIds);
+        return {
+          id: `${identifier}-${dateSec}`,
+          nativeIdentifier: identifier,
+          title: content.title || 'Reminder',
+          body: content.body || '',
+          plantName: (data && data.plantName) || 'General',
+          receivedAt: new Date(ms).toISOString(),
+          plantIds,
+          areaId,
+        };
+      });
+      setReceivedNotifications(mapped);
+    } catch (e) {}
+  };
+
+  // Sync from notification tray when app becomes active (notifications that fired in background)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncReceivedFromTray();
+    });
+    syncReceivedFromTray(); // run once on mount
+    return () => sub?.remove();
+  }, []);
+
+  const notificationCount = receivedNotifications.length;
 
   // ---- Future: replace these with API calls to Node.js backend ----
 
@@ -148,7 +248,7 @@ export const GardenProvider = ({ children }) => {
   };
 
   const clearNotificationCount = () => {
-    setNotificationCount(0);
+    setReceivedNotifications([]);
   };
 
   // Count unique non-empty varieties across all plants
@@ -265,6 +365,9 @@ export const GardenProvider = ({ children }) => {
         updateArea,
         deleteArea,
         notificationCount,
+        receivedNotifications,
+        dismissReceivedNotification,
+        syncReceivedFromTray,
         clearNotificationCount,
         getRecentGrowthLogs,
         getRecentActivity,

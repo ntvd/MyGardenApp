@@ -86,13 +86,13 @@ const CaptureScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Daily Capture</Text>
-          <Text style={styles.subtitle}>
-            Track your plants' growth with daily photos
-          </Text>
         </View>
 
         {/* Capture Area */}
         <View style={styles.captureSection}>
+          <Text style={styles.captureHeadline}>
+            Add pictures of your plants to track their growth!
+          </Text>
           {capturedPhoto ? (
             <View style={styles.previewContainer}>
               <Image
@@ -249,10 +249,10 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: SIZES.fontSm,
+  captureHeadline: {
+    fontSize: SIZES.fontMd,
     color: COLORS.textSecondary,
-    marginTop: 4,
+    marginBottom: SIZES.md,
   },
   captureSection: {
     paddingHorizontal: SIZES.lg,

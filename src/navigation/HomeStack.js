@@ -4,6 +4,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AreaScreen from '../screens/AreaScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import PlantDetailScreen from '../screens/PlantDetailScreen';
+import HomeNotificationsScreen from '../screens/HomeNotificationsScreen';
 import { COLORS, SIZES } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -52,6 +53,11 @@ const HomeStack = () => {
         options={({ route }) => ({
           title: route.params?.plantName || 'Plant',
         })}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={HomeNotificationsScreen}
+        options={{ title: 'Notifications' }}
       />
     </Stack.Navigator>
   );

@@ -29,7 +29,6 @@ const HomeScreen = ({ navigation }) => {
     updateArea,
     deleteArea,
     notificationCount,
-    clearNotificationCount,
   } = useGarden();
   const recentActivity = getRecentActivity().slice(0, 6);
 
@@ -161,10 +160,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
           <TouchableOpacity
             style={styles.settingsBtn}
-            onPress={() => {
-              clearNotificationCount();
-              navigation.navigate('RemindersTab');
-            }}
+            onPress={() => navigation.navigate('Notifications')}
           >
             <Ionicons
               name="notifications-outline"
@@ -521,14 +517,12 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     paddingHorizontal: 5,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.error,
+    backgroundColor: COLORS.error,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notificationBadgeText: {
-    color: COLORS.error,
+    color: COLORS.white,
     fontSize: 10,
     fontWeight: '700',
   },

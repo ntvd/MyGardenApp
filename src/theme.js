@@ -28,6 +28,7 @@ export const COLORS = {
   overlay: '#00000060',
   white: '#FFFFFF',
   danger: '#C0392B',
+  error: '#C0392B',
   success: '#27AE60',
 };
 

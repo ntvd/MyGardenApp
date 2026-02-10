@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -75,9 +75,31 @@ const formatTimeLabel = (date) => {
   return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
+const formatTimeFromHourMinute = (hour, minute) => {
+  const h = hour ?? 8;
+  const m = minute ?? 0;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const formatScheduledDate = (date) => {
+  if (!date) return '';
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 const RemindersScreen = () => {
-  const { plants, areas, getPlantById } = useGarden();
+  const { plants, areas, getPlantById, receivedNotifications } = useGarden();
   const [reminders, setReminders] = useState([]);
+  const receivedIds = useMemo(
+    () => new Set(receivedNotifications.map((n) => n.nativeIdentifier)),
+    [receivedNotifications]
+  );
+  const activeReminders = useMemo(
+    () => reminders.filter((r) => !receivedIds.has(r.id)),
+    [reminders, receivedIds]
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPlantPicker, setShowPlantPicker] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
@@ -124,21 +146,31 @@ const RemindersScreen = () => {
   const loadReminders = async () => {
     try {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      const parsed = scheduled.map((notif) => ({
-        id: notif.identifier,
-        type: notif.content.data?.type || 'custom',
-        plantName: notif.content.data?.plantName || 'General',
-        plantId: notif.content.data?.plantId || null,
-        plantIds: notif.content.data?.plantIds || null,
-        areaId: notif.content.data?.areaId || null,
-        areaIds: notif.content.data?.areaIds || null,
-        frequency: notif.content.data?.frequency || 'daily',
-        timeLabel: notif.content.data?.timeLabel || '8:00 AM',
-        hour: notif.content.data?.hour ?? 8,
-        minute: notif.content.data?.minute ?? 0,
-        title: notif.content.title,
-        body: notif.content.body,
-      }));
+      const parsed = scheduled.map((notif) => {
+        const frequency = notif.content.data?.frequency || 'daily';
+        const trigger = notif.trigger;
+        let scheduledDate = null;
+        if (frequency === 'once' && trigger) {
+          const t = trigger.date ?? trigger.timestamp;
+          if (t != null) scheduledDate = typeof t === 'number' ? new Date(t < 1e12 ? t * 1000 : t) : new Date(t);
+        }
+        return {
+          id: notif.identifier,
+          type: notif.content.data?.type || 'custom',
+          plantName: notif.content.data?.plantName || 'General',
+          plantId: notif.content.data?.plantId || null,
+          plantIds: notif.content.data?.plantIds || null,
+          areaId: notif.content.data?.areaId || null,
+          areaIds: notif.content.data?.areaIds || null,
+          frequency,
+          timeLabel: notif.content.data?.timeLabel || '8:00 AM',
+          hour: notif.content.data?.hour ?? 8,
+          minute: notif.content.data?.minute ?? 0,
+          title: notif.content.title,
+          body: notif.content.body,
+          scheduledDate,
+        };
+      });
       setReminders(parsed);
     } catch (err) {
       console.log('Error loading reminders:', err);
@@ -675,9 +707,6 @@ const RemindersScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Reminders</Text>
-          <Text style={styles.subtitle}>
-            Never forget to care for your plants
-          </Text>
         </View>
 
         {/* Permission Warning */}
@@ -709,12 +738,12 @@ const RemindersScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Active Reminders */}
+        {/* Active Reminders — hide ones that have already fired (shown in Notifications) */}
         <Text style={styles.sectionTitle}>
-          Active Reminders ({reminders.length})
+          Active Reminders ({activeReminders.length})
         </Text>
 
-        {reminders.length === 0 ? (
+        {activeReminders.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
               name="notifications-off-outline"
@@ -729,7 +758,7 @@ const RemindersScreen = () => {
           </View>
         ) : (
           <View style={styles.remindersList}>
-            {reminders.map((reminder) => {
+            {activeReminders.map((reminder) => {
               const typeInfo = getTypeInfo(reminder.type);
               return (
                 <View key={reminder.id} style={styles.reminderCard}>
@@ -759,6 +788,11 @@ const RemindersScreen = () => {
                         />
                         <Text style={styles.metaText}>
                           {getFrequencyLabel(reminder.frequency)}
+                          {reminder.frequency === 'once'
+                            ? (reminder.scheduledDate
+                                ? ` · ${formatScheduledDate(reminder.scheduledDate)} at ${reminder.timeLabel || formatTimeFromHourMinute(reminder.hour, reminder.minute)}`
+                                : ` · ${reminder.timeLabel || formatTimeFromHourMinute(reminder.hour, reminder.minute)}`)
+                            : ` · ${reminder.timeLabel || formatTimeFromHourMinute(reminder.hour, reminder.minute)}`}
                         </Text>
                       </View>
                       {reminder.plantName !== 'General' && (

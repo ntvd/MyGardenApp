@@ -121,7 +121,6 @@ const ActionsScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Actions</Text>
-          <Text style={styles.subtitle}>Event feed</Text>
         </View>
 
         <TouchableOpacity
