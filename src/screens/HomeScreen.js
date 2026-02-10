@@ -163,7 +163,7 @@ const HomeScreen = ({ navigation }) => {
             style={styles.settingsBtn}
             onPress={() => {
               clearNotificationCount();
-              navigation.navigate('HomeNotifications');
+              navigation.navigate('RemindersTab');
             }}
           >
             <Ionicons

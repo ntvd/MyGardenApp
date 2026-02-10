@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeStack from './HomeStack';
 import CaptureScreen from '../screens/CaptureScreen';
 import ActionsScreen from '../screens/ActionsScreen';
+import RemindersScreen from '../screens/RemindersScreen';
 import ProfileStack from './ProfileStack';
 import { COLORS, SIZES } from '../theme';
 
@@ -68,6 +69,21 @@ const AppNavigator = () => {
           tabBarIcon: ({ focused, color, size }) => (
             <TabIcon
               name={focused ? 'flash' : 'flash-outline'}
+              focused={focused}
+              color={color}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="RemindersTab"
+        component={RemindersScreen}
+        options={{
+          tabBarLabel: 'Reminders',
+          tabBarIcon: ({ focused, color, size }) => (
+            <TabIcon
+              name={focused ? 'notifications' : 'notifications-outline'}
               focused={focused}
               color={color}
               size={24}

@@ -1,7 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
-import HomeNotificationsScreen from '../screens/HomeNotificationsScreen';
 import AreaScreen from '../screens/AreaScreen';
 import CategoryScreen from '../screens/CategoryScreen';
 import PlantDetailScreen from '../screens/PlantDetailScreen';
@@ -32,11 +31,6 @@ const HomeStack = () => {
         name="Home"
         component={HomeScreen}
         options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="HomeNotifications"
-        component={HomeNotificationsScreen}
-        options={{ title: 'Notifications' }}
       />
       <Stack.Screen
         name="Area"

@@ -23,7 +23,7 @@ const ProfileScreen = ({ navigation }) => {
   );
 
   const menuItems = [
-    { icon: 'notifications-outline', label: 'Reminders', subtitle: 'Set watering & care alerts', screen: 'Reminders' },
+    { icon: 'notifications-outline', label: 'Reminders', subtitle: 'Set watering & care alerts', screen: 'RemindersTab' },
     { icon: 'analytics-outline', label: 'Garden Stats', subtitle: 'View growth analytics', screen: null },
     { icon: 'cloud-upload-outline', label: 'Backup & Sync', subtitle: 'Connect to cloud storage', screen: null },
     { icon: 'share-outline', label: 'Share Garden', subtitle: 'Share with friends & family', screen: null },
