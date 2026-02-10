@@ -270,6 +270,10 @@ export const GardenProvider = ({ children }) => {
     return event;
   };
 
+  const deleteEvent = (eventId) => {
+    setEvents((prev) => prev.filter((e) => e._id !== eventId));
+  };
+
   const getAllEvents = () => {
     return [...events].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -374,6 +378,7 @@ export const GardenProvider = ({ children }) => {
         getUniqueVarietyCount,
         events,
         addEvent,
+        deleteEvent,
         getAllEvents,
         getEventsForPlant,
       }}

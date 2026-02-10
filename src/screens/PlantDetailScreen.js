@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGarden } from '../context/GardenContext';
 import { COLORS, SIZES } from '../theme';
 
@@ -31,14 +32,27 @@ const EVENT_TYPE_INFO = {
 
 const PlantDetailScreen = ({ route, navigation }) => {
   const { plantId } = route.params;
-  const { getPlantById, addGrowthLog, deleteGrowthLog, deletePlant, getEventsForPlant } =
-    useGarden();
-  const [plant, setPlantState] = useState(getPlantById(plantId));
+  const {
+    getPlantById,
+    addGrowthLog,
+    deleteGrowthLog,
+    deletePlant,
+    getEventsForPlant,
+    addEvent,
+    deleteEvent,
+  } = useGarden();
+  const plant = getPlantById(plantId);
   const [isEntryModalVisible, setIsEntryModalVisible] = useState(false);
   const [entryNote, setEntryNote] = useState('');
   const [entryPhoto, setEntryPhoto] = useState(null);
+  const [entryDateMode, setEntryDateMode] = useState('today');
+  const [entryDate, setEntryDate] = useState(() => new Date());
   const [isPhotoViewerVisible, setIsPhotoViewerVisible] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [isEventModalVisible, setIsEventModalVisible] = useState(false);
+  const [eventType, setEventType] = useState('other');
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
   const photoItems = plant?.growthLog.filter((log) => log.photo) || [];
   const screenWidth = Dimensions.get('window').width;
   const plantEvents = getEventsForPlant(plantId);
@@ -53,14 +67,11 @@ const PlantDetailScreen = ({ route, navigation }) => {
     });
   };
 
-  // Refresh plant data from context
-  const refreshPlant = () => {
-    setPlantState(getPlantById(plantId));
-  };
-
   const openEntryModal = () => {
     setEntryNote('');
     setEntryPhoto(null);
+    setEntryDateMode('today');
+    setEntryDate(new Date());
     setIsEntryModalVisible(true);
   };
 
@@ -104,33 +115,61 @@ const PlantDetailScreen = ({ route, navigation }) => {
 
   const saveGrowthEntry = () => {
     if (!entryNote.trim() && !entryPhoto) {
-      Alert.alert('Add details', 'Write a note or add a photo.');
+      Alert.alert('Add something', 'Enter a note and/or add a photo.');
       return;
     }
 
+    const dateStr = entryDate.toISOString().split('T')[0];
     const newLog = {
       _id: `log_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      photo: entryPhoto,
-      note: entryNote.trim() || 'New growth entry',
+      date: dateStr,
+      photo: entryPhoto || undefined,
+      note: entryNote.trim() || (entryPhoto ? 'Photo' : 'New growth entry'),
     };
     addGrowthLog(plantId, newLog);
-    refreshPlant();
     setIsEntryModalVisible(false);
   };
 
   const confirmDeleteLog = (logId) => {
-    Alert.alert('Delete entry', 'Remove this growth entry?', [
+    Alert.alert('Remove this growth entry?', null, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
-          deleteGrowthLog(plantId, logId);
-          refreshPlant();
-        },
+        onPress: () => deleteGrowthLog(plantId, logId),
       },
     ]);
+  };
+
+  const confirmDeleteEvent = (eventId) => {
+    Alert.alert('Remove this event?', null, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deleteEvent(eventId),
+      },
+    ]);
+  };
+
+  const openEventModal = () => {
+    setEventType('other');
+    setEventTitle('');
+    setEventDescription('');
+    setIsEventModalVisible(true);
+  };
+
+  const closeEventModal = () => setIsEventModalVisible(false);
+
+  const savePlantEvent = () => {
+    const typeInfo = EVENT_TYPE_INFO[eventType] || EVENT_TYPE_INFO.other;
+    addEvent({
+      type: eventType,
+      title: eventTitle.trim() || typeInfo.label,
+      description: eventDescription.trim() || undefined,
+      plantIds: [plantId],
+    });
+    closeEventModal();
   };
 
   const confirmDeletePlant = () => {
@@ -199,7 +238,7 @@ const PlantDetailScreen = ({ route, navigation }) => {
               style={styles.addPhotoBtn}
               onPress={openEntryModal}
             >
-              <Ionicons name="create" size={18} color={COLORS.white} />
+              <Ionicons name="camera" size={18} color={COLORS.white} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.addPhotoBtn, styles.deleteBtn]}
@@ -238,16 +277,26 @@ const PlantDetailScreen = ({ route, navigation }) => {
 
       {/* Growth Timeline */}
       <View style={styles.timelineSection}>
-        <Text style={styles.sectionTitle}>Growth Timeline</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Growth Timeline</Text>
+          <TouchableOpacity
+            style={styles.sectionAddBtn}
+            onPress={openEntryModal}
+          >
+            <Ionicons name="add" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
 
         {plant.growthLog.length === 0 ? (
           <View style={styles.emptyTimeline}>
             <Text style={styles.emptyText}>
-              No growth entries yet. Tap the camera to add one!
+              No growth entries yet. Tap + to add one.
             </Text>
           </View>
         ) : (
-          [...plant.growthLog].reverse().map((log, index) => (
+          [...plant.growthLog]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .map((log, index) => (
             <View key={log._id} style={styles.timelineItem}>
               {/* Timeline line */}
               <View style={styles.timelineLineContainer}>
@@ -302,11 +351,19 @@ const PlantDetailScreen = ({ route, navigation }) => {
 
       {/* Event feed (actions that apply to this plant) */}
       <View style={styles.eventFeedSection}>
-        <Text style={styles.sectionTitle}>Event feed</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Event feed</Text>
+          <TouchableOpacity
+            style={styles.sectionAddBtn}
+            onPress={openEventModal}
+          >
+            <Ionicons name="add" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
         {plantEvents.length === 0 ? (
           <View style={styles.emptyTimeline}>
             <Text style={styles.emptyText}>
-              No events for this plant yet. Add events from the Actions tab.
+              No events for this plant yet. Tap + to add one.
             </Text>
           </View>
         ) : (
@@ -339,6 +396,16 @@ const PlantDetailScreen = ({ route, navigation }) => {
                     {formatEventDateTime(ev.createdAt)}
                   </Text>
                 </View>
+                <TouchableOpacity
+                  style={styles.entryDeleteBtn}
+                  onPress={() => confirmDeleteEvent(ev._id)}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={16}
+                    color={COLORS.error}
+                  />
+                </TouchableOpacity>
               </View>
             );
           })
@@ -388,16 +455,72 @@ const PlantDetailScreen = ({ route, navigation }) => {
           style={styles.modalBackdrop}
         >
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>New Growth Entry</Text>
+            <Text style={styles.modalTitle}>Add entry</Text>
+
+            <Text style={styles.entryFieldLabel}>When?</Text>
+            <View style={styles.entryDateModeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.entryDateModeChip,
+                  entryDateMode === 'today' && styles.entryDateModeChipSelected,
+                ]}
+                onPress={() => {
+                  setEntryDateMode('today');
+                  setEntryDate(new Date());
+                }}
+              >
+                <Text
+                  style={[
+                    styles.entryDateModeChipText,
+                    entryDateMode === 'today' && styles.entryDateModeChipTextSelected,
+                  ]}
+                >
+                  Today
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.entryDateModeChip,
+                  entryDateMode === 'other' && styles.entryDateModeChipSelected,
+                ]}
+                onPress={() => setEntryDateMode('other')}
+              >
+                <Text
+                  style={[
+                    styles.entryDateModeChipText,
+                    entryDateMode === 'other' && styles.entryDateModeChipTextSelected,
+                  ]}
+                >
+                  Other day
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {entryDateMode === 'other' && (
+              <View style={styles.entryCalendarContainer}>
+                <DateTimePicker
+                  value={entryDate}
+                  mode="date"
+                  display="inline"
+                  themeVariant="light"
+                  onChange={(event, date) => {
+                    if (date) setEntryDate(date);
+                  }}
+                  style={styles.entryCalendarPicker}
+                />
+              </View>
+            )}
+
+            <Text style={styles.entryFieldLabel}>Note</Text>
             <TextInput
               style={[styles.textInput, styles.textArea]}
               value={entryNote}
               onChangeText={setEntryNote}
-              placeholder="Add a note about growth"
+              placeholder="What's new? (e.g. growth, repotting, bloom)"
               placeholderTextColor={COLORS.textLight}
               multiline
             />
 
+            <Text style={styles.entryFieldLabel}>Photo (optional)</Text>
             <View style={styles.imagePickerRow}>
               <TouchableOpacity
                 style={styles.imagePickerBtn}
@@ -445,6 +568,89 @@ const PlantDetailScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalPrimary]}
                 onPress={saveGrowthEntry}
+              >
+                <Text style={[styles.modalBtnText, styles.modalPrimaryText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={isEventModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEventModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add event for {plant.name}</Text>
+            <Text style={styles.eventFormLabel}>What did you do?</Text>
+            <View style={styles.eventTypeRow}>
+              {(['water', 'fertilize', 'prune', 'harvest', 'weed', 'other']).map((key) => {
+                const info = EVENT_TYPE_INFO[key] || EVENT_TYPE_INFO.other;
+                return (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.eventTypeChip,
+                    eventType === key && {
+                      backgroundColor: info.color + '22',
+                      borderColor: info.color,
+                    },
+                  ]}
+                  onPress={() => setEventType(key)}
+                >
+                  <Ionicons
+                    name={info.icon}
+                    size={18}
+                    color={eventType === key ? info.color : COLORS.textLight}
+                  />
+                  <Text
+                    style={[
+                      styles.eventTypeChipText,
+                      eventType === key && { color: info.color },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {info.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+              })}
+            </View>
+            <Text style={styles.eventFormLabel}>Title</Text>
+            <TextInput
+              style={styles.textInput}
+              value={eventTitle}
+              onChangeText={setEventTitle}
+              placeholder="e.g. Watered, Fertilized"
+              placeholderTextColor={COLORS.textLight}
+            />
+            <Text style={styles.eventFormLabel}>Description (optional)</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={eventDescription}
+              onChangeText={setEventDescription}
+              placeholder="e.g. Used nitrogen fertilizer"
+              placeholderTextColor={COLORS.textLight}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={closeEventModal}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalPrimary]}
+                onPress={savePlantEvent}
               >
                 <Text style={[styles.modalBtnText, styles.modalPrimaryText]}>
                   Save
@@ -621,11 +827,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.lg,
     marginTop: SIZES.lg,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.md,
+  },
   sectionTitle: {
     fontSize: SIZES.fontLg,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: SIZES.md,
+  },
+  sectionAddBtn: {
+    padding: SIZES.xs,
   },
   timelineItem: {
     flexDirection: 'row',
@@ -722,6 +936,7 @@ const styles = StyleSheet.create({
   },
   eventFeedContent: {
     flex: 1,
+    minWidth: 0,
   },
   eventFeedLabel: {
     fontSize: SIZES.fontSm,
@@ -771,6 +986,49 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: SIZES.radiusLg,
     padding: SIZES.lg,
+  },
+  entryFieldLabel: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.xs,
+  },
+  entryDateModeRow: {
+    flexDirection: 'row',
+    gap: SIZES.sm,
+    marginBottom: SIZES.sm,
+  },
+  entryDateModeChip: {
+    paddingVertical: SIZES.sm,
+    paddingHorizontal: SIZES.md,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  entryDateModeChipSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryMuted + '20',
+  },
+  entryDateModeChipText: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+  },
+  entryDateModeChipTextSelected: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  entryCalendarContainer: {
+    marginBottom: SIZES.sm,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  entryCalendarPicker: {
+    width: '100%',
   },
   modalTitle: {
     fontSize: SIZES.fontLg,
@@ -843,6 +1101,34 @@ const styles = StyleSheet.create({
   },
   modalPrimaryText: {
     color: COLORS.white,
+  },
+  eventFormLabel: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: SIZES.sm,
+    marginBottom: SIZES.xs,
+  },
+  eventTypeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.sm,
+    marginBottom: SIZES.sm,
+  },
+  eventTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SIZES.xs,
+    paddingHorizontal: SIZES.sm,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    gap: 4,
+  },
+  eventTypeChipText: {
+    fontSize: SIZES.fontXs,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
   },
   photoViewerBackdrop: {
     flex: 1,
