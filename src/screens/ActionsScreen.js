@@ -390,12 +390,13 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SIZES.lg,
     paddingTop: SIZES.lg,
-    paddingBottom: SIZES.sm,
+    paddingBottom: SIZES.md,
   },
   title: {
-    fontSize: SIZES.fontXxl,
+    fontSize: SIZES.fontDisplay,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: SIZES.fontSm,
@@ -433,17 +434,17 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.radiusLg,
   },
   emptyTitle: {
-    fontSize: SIZES.fontMd,
+    fontSize: SIZES.fontLg,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    marginTop: SIZES.sm,
+    marginTop: SIZES.md,
   },
   emptySubtitle: {
     fontSize: SIZES.fontSm,
-    color: COLORS.textLight,
-    marginTop: 4,
+    color: COLORS.textSecondary,
+    marginTop: SIZES.xs,
     textAlign: 'center',
-    paddingHorizontal: SIZES.lg,
+    paddingHorizontal: SIZES.xl,
   },
   eventList: {
     paddingHorizontal: SIZES.lg,

@@ -297,9 +297,9 @@ const styles = StyleSheet.create({
     paddingTop: SIZES.md,
   },
   sectionTitle: {
-    fontSize: SIZES.fontMd,
+    fontSize: SIZES.fontLg,
     fontWeight: '600',
-    color: COLORS.textSecondary,
+    color: COLORS.textPrimary,
     marginBottom: SIZES.sm,
   },
   feedSectionTitle: {

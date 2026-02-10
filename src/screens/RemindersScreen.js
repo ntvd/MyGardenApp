@@ -852,14 +852,14 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: SIZES.lg,
-    paddingTop: SIZES.md,
-    paddingBottom: SIZES.sm,
+    paddingTop: SIZES.lg,
+    paddingBottom: SIZES.md,
   },
   title: {
-    fontSize: SIZES.fontXxl,
+    fontSize: SIZES.fontDisplay,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: SIZES.fontSm,
@@ -930,7 +930,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     paddingHorizontal: SIZES.lg,
-    marginBottom: SIZES.md,
+    marginBottom: SIZES.sm,
   },
   remindersList: {
     paddingHorizontal: SIZES.lg,

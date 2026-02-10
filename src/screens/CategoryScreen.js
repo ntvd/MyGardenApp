@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   logCountText: {
-    fontSize: 11,
+    fontSize: SIZES.fontXs,
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -436,6 +436,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: SIZES.fontSm,
+    fontWeight: '600',
     color: COLORS.textSecondary,
     marginBottom: 6,
     marginTop: SIZES.sm,

@@ -741,6 +741,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: SIZES.fontSm,
+    fontWeight: '600',
     color: COLORS.textSecondary,
     marginBottom: 6,
     marginTop: SIZES.sm,

@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SIZES.lg,
     paddingTop: SIZES.lg,
+    paddingBottom: SIZES.md,
   },
   title: {
     fontSize: SIZES.fontDisplay,

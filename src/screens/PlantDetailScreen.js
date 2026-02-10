@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontXxl,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   plantMeta: {
     fontSize: SIZES.fontSm,

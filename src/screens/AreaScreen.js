@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     paddingHorizontal: SIZES.lg,
     marginTop: SIZES.lg,
-    marginBottom: SIZES.md,
+    marginBottom: SIZES.sm,
   },
   categoriesGrid: {
     flexDirection: 'row',
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: SIZES.fontXs,
     fontWeight: '700',
     color: COLORS.white,
   },
@@ -301,6 +301,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: SIZES.fontSm,
+    fontWeight: '600',
     color: COLORS.textSecondary,
     marginBottom: 6,
     marginTop: SIZES.sm,
