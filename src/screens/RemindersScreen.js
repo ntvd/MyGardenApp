@@ -37,14 +37,29 @@ const REMINDER_TYPES = [
   { id: 'custom', label: 'Custom', icon: 'create', color: '#95A5A6' },
 ];
 
-const FREQUENCY_OPTIONS = [
-  { id: 'daily', label: 'Every day', seconds: 86400 },
-  { id: 'every2', label: 'Every 2 days', seconds: 172800 },
-  { id: 'every3', label: 'Every 3 days', seconds: 259200 },
-  { id: 'weekly', label: 'Every week', seconds: 604800 },
-  { id: 'biweekly', label: 'Every 2 weeks', seconds: 1209600 },
-  { id: 'monthly', label: 'Every month', seconds: 2592000 },
-];
+const LEGACY_FREQUENCY_MAP = {
+  daily: 1, every2: 2, every3: 3, weekly: 7, biweekly: 14, monthly: 30,
+};
+
+const getFrequencyLabel = (frequency) => {
+  if (frequency === 'once') return 'Once';
+  if (frequency?.startsWith('every_')) {
+    const days = frequency.replace('every_', '');
+    return days === '1' ? 'Every day' : `Every ${days} days`;
+  }
+  // Legacy fallback
+  const days = LEGACY_FREQUENCY_MAP[frequency];
+  if (days === 1) return 'Every day';
+  if (days) return `Every ${days} days`;
+  return frequency;
+};
+
+const getTomorrowDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 const createTimeDate = (hour = 8, minute = 0) => {
   const d = new Date();
@@ -68,13 +83,15 @@ const RemindersScreen = () => {
   const [hasPermission, setHasPermission] = useState(false);
 
   // Selection state: tracks selected areas and individual plants separately
-  const [selectedAll, setSelectedAll] = useState(true);
+  const [selectedAll, setSelectedAll] = useState(false);
   const [selectedAreaIds, setSelectedAreaIds] = useState([]);
   const [selectedPlants, setSelectedPlants] = useState([]);
 
   // New reminder form state
   const [reminderTitle, setReminderTitle] = useState('');
-  const [selectedFrequency, setSelectedFrequency] = useState(null);
+  const [frequencyMode, setFrequencyMode] = useState(null); // 'once' | 'recurring'
+  const [selectedDate, setSelectedDate] = useState(() => getTomorrowDate());
+  const [intervalDays, setIntervalDays] = useState('');
   const [selectedTime, setSelectedTime] = useState(() => createTimeDate(8, 0));
   const [customNote, setCustomNote] = useState('');
   const [editingReminderId, setEditingReminderId] = useState(null);
@@ -130,10 +147,12 @@ const RemindersScreen = () => {
 
   const resetForm = () => {
     setReminderTitle('');
-    setSelectedAll(true);
+    setSelectedAll(false);
     setSelectedAreaIds([]);
     setSelectedPlants([]);
-    setSelectedFrequency(null);
+    setFrequencyMode(null);
+    setSelectedDate(getTomorrowDate());
+    setIntervalDays('');
     setSelectedTime(createTimeDate(8, 0));
     setCustomNote('');
     setEditingReminderId(null);
@@ -227,14 +246,37 @@ const RemindersScreen = () => {
       const plist = plantIds.map((id) => getPlantById(id)).filter(Boolean);
       setSelectedPlants(plist);
     }
-    setSelectedFrequency(
-      FREQUENCY_OPTIONS.find((f) => f.id === reminder.frequency) ||
-        FREQUENCY_OPTIONS[0]
-    );
+    // Restore frequency mode
+    const freq = reminder.frequency;
+    if (freq === 'once') {
+      setFrequencyMode('once');
+      setSelectedDate(getTomorrowDate());
+      setIntervalDays('');
+    } else if (freq?.startsWith('every_')) {
+      setFrequencyMode('recurring');
+      setIntervalDays(freq.replace('every_', ''));
+      setSelectedDate(getTomorrowDate());
+    } else {
+      // Legacy frequencies (daily, weekly, etc.)
+      const days = LEGACY_FREQUENCY_MAP[freq] || 1;
+      setFrequencyMode('recurring');
+      setIntervalDays(String(days));
+      setSelectedDate(getTomorrowDate());
+    }
     setSelectedTime(createTimeDate(reminder.hour ?? 8, reminder.minute ?? 0));
     setCustomNote(reminder.body || '');
     setEditingReminderId(reminder.id);
     setShowCreateModal(true);
+  };
+
+  const isFrequencyValid = () => {
+    if (!frequencyMode) return false;
+    if (frequencyMode === 'once') return !!selectedDate;
+    if (frequencyMode === 'recurring') {
+      const n = parseInt(intervalDays, 10);
+      return !isNaN(n) && n >= 1;
+    }
+    return false;
   };
 
   const handleCreate = async () => {
@@ -243,9 +285,16 @@ const RemindersScreen = () => {
       Alert.alert('Enter a title', 'Choose a title for your reminder (e.g. Time to water, trim, fertilize).');
       return;
     }
-    if (!selectedFrequency) {
+    if (!frequencyMode) {
       Alert.alert('Select frequency', 'Choose how often to be reminded.');
       return;
+    }
+    if (frequencyMode === 'recurring') {
+      const n = parseInt(intervalDays, 10);
+      if (isNaN(n) || n < 1) {
+        Alert.alert('Enter days', 'Please enter a valid number of days (1 or more).');
+        return;
+      }
     }
 
     const scopeData = getScopeDataForNotification();
@@ -257,11 +306,31 @@ const RemindersScreen = () => {
         await Notifications.cancelScheduledNotificationAsync(editingReminderId);
       }
 
-      const trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: selectedFrequency.seconds,
-        repeats: true,
-      };
+      let trigger;
+      let frequencyId;
+      let alertMsg;
+
+      if (frequencyMode === 'once') {
+        // Combine selectedDate + selectedTime into one datetime
+        const fireDate = new Date(selectedDate);
+        fireDate.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: fireDate,
+        };
+        frequencyId = 'once';
+        const dateStr = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        alertMsg = `You'll be reminded on ${dateStr}.`;
+      } else {
+        const days = parseInt(intervalDays, 10);
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: days * 86400,
+          repeats: true,
+        };
+        frequencyId = `every_${days}`;
+        alertMsg = days === 1 ? "You'll be reminded every day." : `You'll be reminded every ${days} days.`;
+      }
 
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -274,7 +343,7 @@ const RemindersScreen = () => {
             plantId: scopeData.plantId,
             plantIds: scopeData.plantIds,
             areaIds: scopeData.areaIds,
-            frequency: selectedFrequency.id,
+            frequency: frequencyId,
             timeLabel: formatTimeLabel(selectedTime),
             hour: selectedTime.getHours(),
             minute: selectedTime.getMinutes(),
@@ -288,7 +357,7 @@ const RemindersScreen = () => {
       loadReminders();
       Alert.alert(
         editingReminderId ? 'Reminder Updated 🌱' : 'Reminder Set! 🌱',
-        `You'll be reminded ${selectedFrequency.label.toLowerCase()}.`
+        alertMsg
       );
     } catch (err) {
       console.log('Error scheduling:', err);
@@ -358,7 +427,7 @@ const RemindersScreen = () => {
             <Text
               style={[
                 styles.modalSave,
-                (!reminderTitle.trim() || !selectedFrequency) &&
+                (!reminderTitle.trim() || !isFrequencyValid()) &&
                   styles.modalSaveDisabled,
               ]}
             >
@@ -471,36 +540,82 @@ const RemindersScreen = () => {
 
           {/* Frequency */}
           <Text style={styles.formLabel}>How often?</Text>
-          <View style={styles.frequencyList}>
-            {FREQUENCY_OPTIONS.map((freq) => (
-              <TouchableOpacity
-                key={freq.id}
+          <View style={styles.frequencyModeRow}>
+            <TouchableOpacity
+              style={[
+                styles.frequencyModeCard,
+                frequencyMode === 'once' && styles.frequencyModeCardSelected,
+              ]}
+              onPress={() => setFrequencyMode('once')}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={22}
+                color={frequencyMode === 'once' ? COLORS.primary : COLORS.textSecondary}
+              />
+              <Text
                 style={[
-                  styles.frequencyItem,
-                  selectedFrequency?.id === freq.id &&
-                    styles.frequencyItemSelected,
+                  styles.frequencyModeText,
+                  frequencyMode === 'once' && styles.frequencyModeTextSelected,
                 ]}
-                onPress={() => setSelectedFrequency(freq)}
               >
-                <Text
-                  style={[
-                    styles.frequencyText,
-                    selectedFrequency?.id === freq.id &&
-                      styles.frequencyTextSelected,
-                  ]}
-                >
-                  {freq.label}
-                </Text>
-                {selectedFrequency?.id === freq.id && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color={COLORS.primary}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
+                Only Once
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.frequencyModeCard,
+                frequencyMode === 'recurring' && styles.frequencyModeCardSelected,
+              ]}
+              onPress={() => setFrequencyMode('recurring')}
+            >
+              <Ionicons
+                name="repeat"
+                size={22}
+                color={frequencyMode === 'recurring' ? COLORS.primary : COLORS.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.frequencyModeText,
+                  frequencyMode === 'recurring' && styles.frequencyModeTextSelected,
+                ]}
+              >
+                Recurring
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {frequencyMode === 'once' && (
+            <View style={styles.calendarContainer}>
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="inline"
+                minimumDate={new Date()}
+                themeVariant="light"
+                onChange={(event, date) => {
+                  if (date) setSelectedDate(date);
+                }}
+                style={styles.calendarPicker}
+              />
+            </View>
+          )}
+
+          {frequencyMode === 'recurring' && (
+            <View style={styles.intervalInputRow}>
+              <Text style={styles.intervalLabel}>Every</Text>
+              <TextInput
+                style={styles.intervalInput}
+                value={intervalDays}
+                onChangeText={(text) => setIntervalDays(text.replace(/[^0-9]/g, ''))}
+                keyboardType="number-pad"
+                placeholder="3"
+                placeholderTextColor={COLORS.textLight}
+                maxLength={3}
+              />
+              <Text style={styles.intervalLabel}>day(s)</Text>
+            </View>
+          )}
 
           {/* Preferred time */}
           <Text style={styles.formLabel}>Preferred time</Text>
@@ -638,14 +753,12 @@ const RemindersScreen = () => {
                     <View style={styles.reminderMeta}>
                       <View style={styles.metaTag}>
                         <Ionicons
-                          name="repeat"
+                          name={reminder.frequency === 'once' ? 'calendar-outline' : 'repeat'}
                           size={12}
                           color={COLORS.textLight}
                         />
                         <Text style={styles.metaText}>
-                          {FREQUENCY_OPTIONS.find(
-                            (f) => f.id === reminder.frequency
-                          )?.label || reminder.frequency}
+                          {getFrequencyLabel(reminder.frequency)}
                         </Text>
                       </View>
                       {reminder.plantName !== 'General' && (
@@ -994,31 +1107,73 @@ const styles = StyleSheet.create({
   plantChipTextSelected: {
     color: COLORS.white,
   },
-  frequencyList: {
-    paddingHorizontal: SIZES.lg,
-    gap: SIZES.xs,
-  },
-  frequencyItem: {
+  frequencyModeRow: {
     flexDirection: 'row',
+    paddingHorizontal: SIZES.lg,
+    gap: SIZES.sm,
+    marginBottom: SIZES.sm,
+  },
+  frequencyModeCard: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    paddingVertical: SIZES.md,
     backgroundColor: COLORS.backgroundCard,
     borderRadius: SIZES.radiusMd,
-    padding: SIZES.md,
     borderWidth: 1.5,
     borderColor: COLORS.border,
+    gap: SIZES.xs,
   },
-  frequencyItemSelected: {
+  frequencyModeCardSelected: {
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '08',
+    backgroundColor: COLORS.primary + '10',
   },
-  frequencyText: {
-    fontSize: SIZES.fontMd,
+  frequencyModeText: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '500',
     color: COLORS.textSecondary,
   },
-  frequencyTextSelected: {
+  frequencyModeTextSelected: {
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  calendarContainer: {
+    marginHorizontal: SIZES.lg,
+    marginBottom: SIZES.sm,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  calendarPicker: {
+    width: '100%',
+  },
+  intervalInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.lg,
+    gap: SIZES.sm,
+    marginBottom: SIZES.sm,
+  },
+  intervalLabel: {
+    fontSize: SIZES.fontMd,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+  },
+  intervalInput: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.sm + 2,
+    fontSize: SIZES.fontLg,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    minWidth: 60,
   },
   timePickerContainer: {
     marginHorizontal: SIZES.lg,
