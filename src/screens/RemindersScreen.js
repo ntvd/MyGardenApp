@@ -411,18 +411,6 @@ const RemindersScreen = () => {
     ]);
   };
 
-  const handleTestNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '🌱 Test Reminder',
-        body: 'Your garden reminders are working!',
-        sound: true,
-      },
-      trigger: { type: 'timeInterval', seconds: 3 },
-    });
-    Alert.alert('Test Sent', 'You should see a notification in about 3 seconds.');
-  };
-
   const getTypeInfo = (typeId) =>
     REMINDER_TYPES.find((t) => t.id === typeId) || REMINDER_TYPES[5];
 
@@ -728,14 +716,6 @@ const RemindersScreen = () => {
             <Ionicons name="add-circle" size={22} color={COLORS.white} />
             <Text style={styles.createBtnText}>New Reminder</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.testBtn}
-            onPress={handleTestNotification}
-          >
-            <Ionicons name="notifications" size={18} color={COLORS.primary} />
-            <Text style={styles.testBtnText}>Test</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Active Reminders — hide ones that have already fired (shown in Notifications) */}
@@ -907,23 +887,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontMd,
     fontWeight: '600',
     color: COLORS.white,
-  },
-  testBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.backgroundCard,
-    borderRadius: SIZES.radiusFull,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: SIZES.sm + 4,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  testBtnText: {
-    fontSize: SIZES.fontSm,
-    fontWeight: '600',
-    color: COLORS.primary,
   },
   sectionTitle: {
     fontSize: SIZES.fontLg,
